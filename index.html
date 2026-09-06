@@ -223,6 +223,7 @@ canvas#sigCanvas{width:100%; height:110px; background:#fff; border:1px solid var
         <div class="tile" data-nav="reports"><div class="ico">▤</div><div class="lbl">Reports</div></div>
         <div class="tile" data-nav="users"><div class="ico">◎</div><div class="lbl">Users</div></div>
         <div class="tile" data-nav="bits"><div class="ico">⚑</div><div class="lbl">Bits / Posts</div></div>
+        <div class="tile" data-nav="incidenttypes"><div class="ico">!</div><div class="lbl">Incident Types</div></div>
       </div>
 
       <div class="section-title">Recent Activity</div>
@@ -312,6 +313,18 @@ canvas#sigCanvas{width:100%; height:110px; background:#fff; border:1px solid var
       </div>
     </div>
 
+    <!-- INCIDENT TYPES -->
+    <div id="view-incidenttypes" class="hidden">
+      <div class="card">
+        <h2>Incident Types</h2>
+        <div class="sub">Comes pre-loaded with Theft, Access Violation, Fighting, and Non-Compliance — add more anytime, here or directly while logging an incident.</div>
+        <div id="incidentTypesMgmtList"></div>
+        <hr style="border:none; border-top:1px solid var(--line); margin:14px 0;">
+        <div class="field"><label>New Incident Type</label><input type="text" id="newIncidentTypeName" placeholder="e.g. Vandalism"></div>
+        <button class="btn btn-navy btn-block" id="addIncidentTypeMgmtBtn">Add Type</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -340,7 +353,7 @@ const TYPES = [
     {name:'condition', label:'Condition / Remarks', type:'textarea'}
   ]},
   {key:'incident', label:'Incident', icon:'!', fields:[
-    {name:'incidentType', label:'Incident Type', type:'text'},
+    {name:'incidentType', label:'Incident Type', type:'incident-type-select'},
     {name:'location', label:'Location', type:'text'},
     {name:'severity', label:'Severity', type:'select', options:['Low','Medium','High','Critical']},
     {name:'description', label:'Description', type:'textarea'},
@@ -371,7 +384,10 @@ const TYPES = [
     {name:'staffName', label:'Staff Name', type:'text'},
     {name:'timeIn', label:'Time In', type:'time'},
     {name:'timeOut', label:'Time Out', type:'time'},
-    {name:'status', label:'Status', type:'select', options:['Present','Absent','Late','On Leave']}
+    {name:'status', label:'Status', type:'select', options:['Present','Absent','Late','On Leave']},
+    {name:'absenceReason', label:'Reason for Absence', type:'select',
+      options:['Permitted','Suspended','Medical','Unauthorized / AWOL','Compassionate / Bereavement','Annual Leave','Other'],
+      conditional:{field:'status', value:'Absent'}}
   ]},
   {key:'posting', label:'Posting', icon:'B', roster:true, fields:[]}
 ];
@@ -381,12 +397,13 @@ function typeCfg(key){ return TYPES.find(t=>t.key===key); }
 let db = null;
 function idbOpen(){
   return new Promise((resolve, reject)=>{
-    const req = indexedDB.open('slb_physec_db', 2);
+    const req = indexedDB.open('slb_physec_db', 3);
     req.onupgradeneeded = function(e){
       const d = e.target.result;
       if(!d.objectStoreNames.contains('users')) d.createObjectStore('users', {keyPath:'id'});
       if(!d.objectStoreNames.contains('activities')) d.createObjectStore('activities', {keyPath:'id'});
       if(!d.objectStoreNames.contains('bits')) d.createObjectStore('bits', {keyPath:'id'});
+      if(!d.objectStoreNames.contains('incidentTypes')) d.createObjectStore('incidentTypes', {keyPath:'id'});
     };
     req.onsuccess = function(e){ db = e.target.result; resolve(db); };
     req.onerror = function(e){ reject(e); };
@@ -426,6 +443,7 @@ let currentUser = null;
 let users = [];
 let activities = [];
 let bits = [];
+let incidentTypes = [];
 let activeTypeKey = null;
 let editingId = null;
 let photoBuffer = [];
@@ -437,6 +455,15 @@ idbOpen().then(async ()=>{
   users = await idbGetAll('users');
   activities = await idbGetAll('activities');
   bits = await idbGetAll('bits');
+  incidentTypes = await idbGetAll('incidentTypes');
+  if(incidentTypes.length === 0){
+    const defaults = ['Theft','Access Violation','Fighting','Non-Compliance'];
+    for(const name of defaults){
+      const rec = {id:uid(), name:name, createdAt:Date.now()};
+      await idbPut('incidentTypes', rec);
+      incidentTypes.push(rec);
+    }
+  }
   buildTypeUI();
   if(users.length === 0){
     showSetup();
@@ -558,7 +585,7 @@ document.getElementById('logoutBtn').addEventListener('click', function(){
 
 // ---------- Navigation ----------
 function showView(id){
-  ['view-home','view-form','view-log','view-reports','view-users','view-bits'].forEach(function(v){
+  ['view-home','view-form','view-log','view-reports','view-users','view-bits','view-incidenttypes'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v!==id);
   });
 }
@@ -574,6 +601,7 @@ document.querySelectorAll('.tile[data-nav]').forEach(function(t){
     if(nav==='reports'){ showView('view-reports'); }
     if(nav==='users'){ showView('view-users'); renderUsersMgmt(); }
     if(nav==='bits'){ showView('view-bits'); renderBitsMgmt(); }
+    if(nav==='incidenttypes'){ showView('view-incidenttypes'); renderIncidentTypesMgmt(); }
   });
 });
 
@@ -669,8 +697,21 @@ function openForm(typeKey, existing){
     document.getElementById('addGuardRowBtn').addEventListener('click', function(){ addRosterRow('','',nowTime()); });
   }else{
     cfg.fields.forEach(function(f){
-      wrap.appendChild(buildField(f.name, f.label, f.type||'text', existing && existing.details ? existing.details[f.name] : '', f.options));
+      let fieldEl;
+      const val = existing && existing.details ? existing.details[f.name] : '';
+      if(f.type === 'incident-type-select'){
+        fieldEl = buildIncidentTypeField(val);
+      }else{
+        fieldEl = buildField(f.name, f.label, f.type||'text', val, f.options);
+      }
+      if(f.conditional){
+        fieldEl.dataset.condField = f.conditional.field;
+        fieldEl.dataset.condValue = f.conditional.value;
+        fieldEl.style.display = 'none';
+      }
+      wrap.appendChild(fieldEl);
     });
+    wireConditionalFields(wrap);
   }
   photoBuffer = existing && existing.photos ? existing.photos.slice() : [];
   renderPhotoThumbs();
@@ -695,6 +736,48 @@ function buildField(name,label,type,value,options){
   }
   f.innerHTML = inner;
   return f;
+}
+function buildIncidentTypeField(value){
+  const wrap = document.createElement('div'); wrap.className = 'field';
+  const opts = incidentTypes.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(function(t){
+    return '<option value="'+escapeHtml(t.name)+'"'+(t.name===value?' selected':'')+'>'+escapeHtml(t.name)+'</option>';
+  }).join('');
+  wrap.innerHTML =
+    '<label>Incident Type</label>'+
+    '<div style="display:flex; gap:6px;">'+
+      '<select data-field="incidentType" style="flex:1; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px;">'+
+        '<option value="">Select type…</option>'+opts+
+      '</select>'+
+      '<button type="button" id="addIncidentTypeInlineBtn" class="btn btn-outline btn-small">+ Add</button>'+
+    '</div>';
+  return wrap;
+}
+function wireConditionalFields(wrap){
+  wrap.querySelectorAll('.field[data-cond-field]').forEach(function(fieldEl){
+    const trigger = wrap.querySelector('[data-field="'+fieldEl.dataset.condField+'"]');
+    if(!trigger) return;
+    function update(){
+      fieldEl.style.display = (trigger.value === fieldEl.dataset.condValue) ? '' : 'none';
+    }
+    trigger.addEventListener('change', update);
+    update();
+  });
+  const addBtn = wrap.querySelector('#addIncidentTypeInlineBtn');
+  if(addBtn){
+    addBtn.addEventListener('click', async function(){
+      const name = prompt('Enter a new incident type:');
+      if(!name) return;
+      const rec = await addIncidentTypeToList(name);
+      if(!rec) return;
+      const sel = wrap.querySelector('[data-field="incidentType"]');
+      if(sel && !Array.from(sel.options).some(o=>o.value===rec.name)){
+        const opt = document.createElement('option');
+        opt.value = rec.name; opt.textContent = rec.name;
+        sel.appendChild(opt);
+      }
+      if(sel) sel.value = rec.name;
+    });
+  }
 }
 function buildRosterField(){
   const wrap = document.createElement('div'); wrap.className='field';
@@ -753,6 +836,7 @@ document.getElementById('saveActivityBtn').addEventListener('click', async funct
   const details = {};
   cfg.fields.forEach(f=>{ details[f.name] = getVal(f.name); });
   if(cfg.roster){ details.roster = getRosterRows(); }
+  if(activeTypeKey === 'attendance' && details.status !== 'Absent'){ details.absenceReason = ''; }
   const record = {
     id: editingId || uid(),
     type: activeTypeKey,
@@ -971,6 +1055,46 @@ document.getElementById('addBitBtn').addEventListener('click', async function(){
   bits.push(b);
   document.getElementById('newBitName').value='';
   renderBitsMgmt();
+});
+
+// ---------- Incident Types management ----------
+function renderIncidentTypesMgmt(){
+  const wrap = document.getElementById('incidentTypesMgmtList');
+  wrap.innerHTML = '';
+  incidentTypes.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(function(t){
+    const row = document.createElement('div');
+    row.className = 'user-pick';
+    row.style.marginBottom = '8px';
+    row.innerHTML = '<span>'+escapeHtml(t.name)+'</span><button class="btn btn-small btn-danger-outline" data-deltype="'+t.id+'">Remove</button>';
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('[data-deltype]').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      const id = btn.getAttribute('data-deltype');
+      if(!confirm('Remove this incident type from the list?')) return;
+      await idbDelete('incidentTypes', id);
+      incidentTypes = incidentTypes.filter(t=>t.id!==id);
+      renderIncidentTypesMgmt();
+    });
+  });
+}
+async function addIncidentTypeToList(name){
+  name = (name||'').trim();
+  if(!name) return null;
+  if(incidentTypes.some(t=>t.name.toLowerCase()===name.toLowerCase())){
+    return incidentTypes.find(t=>t.name.toLowerCase()===name.toLowerCase());
+  }
+  const rec = {id:uid(), name:name, createdAt:Date.now()};
+  await idbPut('incidentTypes', rec);
+  incidentTypes.push(rec);
+  return rec;
+}
+document.getElementById('addIncidentTypeMgmtBtn').addEventListener('click', async function(){
+  const name = document.getElementById('newIncidentTypeName').value.trim();
+  if(!name){ alert('Enter an incident type name.'); return; }
+  await addIncidentTypeToList(name);
+  document.getElementById('newIncidentTypeName').value='';
+  renderIncidentTypesMgmt();
 });
 
 // ---------- Reports ----------
