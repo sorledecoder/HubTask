@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>SLB Physical Security</title>
+<style>
+:root{
+  --navy:#0F2438; --navy-2:#17324A; --amber:#D69A2D; --amber-soft:#F3E2BE;
+  --ink:#1B242C; --ink-soft:#5B6773; --paper:#F6F7F9; --line:#DCE1E6;
+  --danger:#B23B3B; --ok:#276B4A; --shadow:0 8px 24px rgba(15,36,56,0.14);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#E9ECEF; color:var(--ink); -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit; cursor:pointer;}
+.hidden{display:none !important;}
+
+/* Top bar */
+.topbar{
+  position:sticky; top:0; z-index:40; background:var(--navy); color:#F1F4F7;
+  display:flex; align-items:center; justify-content:space-between; padding:10px 14px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.2);
+}
+.brand{display:flex; align-items:center; gap:9px;}
+.badge{
+  width:34px; height:34px; border-radius:8px; background:var(--amber); color:var(--navy);
+  display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; letter-spacing:0.5px;
+  flex-shrink:0;
+}
+.brand-text{font-weight:700; font-size:15px;}
+.brand-text small{display:block; font-weight:400; font-size:10.5px; color:#C9D3DC;}
+.top-actions{display:flex; gap:6px; align-items:center;}
+.icon-btn{
+  background:rgba(255,255,255,0.1); border:none; color:#F1F4F7; border-radius:7px;
+  padding:7px 10px; font-size:12.5px; font-weight:600;
+}
+.icon-btn.warn{background:rgba(178,59,59,0.35);}
+
+.container{max-width:640px; margin:0 auto; padding:14px 12px 40px;}
+
+/* Cards */
+.card{background:#fff; border-radius:12px; box-shadow:var(--shadow); padding:16px; margin-bottom:14px;}
+.card h2{margin:0 0 4px; font-size:16px;}
+.card .sub{color:var(--ink-soft); font-size:12.5px; margin-bottom:12px;}
+
+/* Login */
+.login-wrap{display:flex; align-items:center; justify-content:center; min-height:80vh; padding:20px;}
+.login-card{background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:26px 22px; width:100%; max-width:360px; text-align:center;}
+.login-card .badge{width:60px; height:60px; font-size:18px; border-radius:14px; margin:0 auto 12px;}
+.login-card h1{font-size:18px; margin:0 0 2px;}
+.login-card p{color:var(--ink-soft); font-size:12.5px; margin-top:2px; margin-bottom:18px;}
+.user-list{display:flex; flex-direction:column; gap:8px; margin-bottom:10px;}
+.user-pick{
+  display:flex; justify-content:space-between; align-items:center; padding:11px 14px; border:1px solid var(--line);
+  border-radius:9px; background:var(--paper); font-weight:600; font-size:14px;
+}
+.user-pick span.role{font-weight:400; font-size:11px; color:var(--ink-soft);}
+.pin-dots{display:flex; gap:10px; justify-content:center; margin:16px 0;}
+.pin-dot{width:14px; height:14px; border-radius:50%; border:1.5px solid var(--navy);}
+.pin-dot.filled{background:var(--navy);}
+.keypad{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; max-width:230px; margin:0 auto;}
+.keypad button{
+  padding:14px 0; font-size:18px; border-radius:10px; border:1px solid var(--line); background:#fff; font-weight:700;
+}
+.keypad button.wide{grid-column:span 1; font-size:13px; color:var(--ink-soft);}
+.field{margin-bottom:12px; text-align:left;}
+.field label{display:block; font-size:12px; color:var(--ink-soft); margin-bottom:4px; font-weight:600;}
+.field input, .field select, .field textarea{
+  width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; outline:none;
+}
+.field input:focus, .field select:focus, .field textarea:focus{border-color:var(--navy);}
+.field textarea{min-height:70px; resize:vertical;}
+
+.btn{border:none; border-radius:9px; padding:11px 16px; font-size:14px; font-weight:700;}
+.btn-block{width:100%;}
+.btn-navy{background:var(--navy); color:#fff;}
+.btn-amber{background:var(--amber); color:#2A2013;}
+.btn-outline{background:#fff; border:1px solid var(--line); color:var(--ink);}
+.btn-danger{background:var(--danger); color:#fff;}
+.btn-danger-outline{background:#fff; border:1px solid var(--danger); color:var(--danger);}
+.btn-small{padding:7px 10px; font-size:12.5px; border-radius:7px;}
+.link-btn{background:none; border:none; color:var(--navy); font-size:12.5px; text-decoration:underline; font-weight:600;}
+
+/* Dashboard grid */
+.grid{display:grid; grid-template-columns:repeat(3,1fr); gap:9px;}
+.tile{
+  background:#fff; border-radius:12px; box-shadow:var(--shadow); padding:14px 6px; text-align:center;
+  border:1px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.tile .ico{width:34px; height:34px; border-radius:9px; background:var(--amber-soft); color:var(--navy); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;}
+.tile .lbl{font-size:11.5px; font-weight:700; line-height:1.2;}
+.section-title{font-size:11px; letter-spacing:1.2px; text-transform:uppercase; color:var(--ink-soft); font-weight:800; margin:18px 0 8px;}
+
+/* Activity list */
+.act-row{
+  background:#fff; border-radius:10px; box-shadow:var(--shadow); padding:12px 14px; margin-bottom:9px;
+  display:flex; justify-content:space-between; align-items:flex-start; gap:10px; cursor:pointer;
+}
+.act-row .type-tag{
+  display:inline-block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.4px;
+  background:var(--amber-soft); color:var(--navy); padding:2px 7px; border-radius:5px; margin-bottom:4px;
+}
+.act-row .title-line{font-weight:700; font-size:13.5px;}
+.act-row .meta-line{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+.act-row .chev{color:var(--ink-soft); font-size:16px;}
+.filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;}
+.filters select, .filters input{flex:1; min-width:110px; padding:8px 9px; border:1px solid var(--line); border-radius:8px; font-size:13px;}
+
+/* Detail modal */
+.overlay{position:fixed; inset:0; background:rgba(15,24,32,0.55); z-index:80; display:none; align-items:flex-end; justify-content:center;}
+.overlay.open{display:flex;}
+.panel{background:#fff; width:100%; max-width:560px; max-height:88vh; overflow-y:auto; border-radius:16px 16px 0 0; padding:18px 16px 22px; box-shadow:0 -8px 30px rgba(0,0,0,0.3);}
+.panel-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; position:sticky; top:0; background:#fff; padding-bottom:6px;}
+.detail-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px; margin:10px 0;}
+.detail-grid .dg-label{color:var(--ink-soft); font-size:11px; text-transform:uppercase; letter-spacing:0.4px;}
+.photo-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:10px;}
+.photo-grid img{width:100%; height:78px; object-fit:cover; border-radius:8px; border:1px solid var(--line);}
+.sig-img{max-width:220px; border:1px solid var(--line); border-radius:8px; margin-top:6px;}
+
+/* Photo capture */
+.photo-thumbs{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0;}
+.photo-thumb{position:relative; width:70px; height:70px; border-radius:8px; overflow:hidden; border:1px solid var(--line);}
+.photo-thumb img{width:100%; height:100%; object-fit:cover;}
+.photo-thumb button{
+  position:absolute; top:2px; right:2px; background:rgba(178,59,59,0.9); color:#fff; border:none; border-radius:50%;
+  width:18px; height:18px; font-size:11px; line-height:1; padding:0;
+}
+.add-photo-btn{
+  width:70px; height:70px; border-radius:8px; border:1.5px dashed var(--line); background:var(--paper);
+  display:flex; align-items:center; justify-content:center; font-size:22px; color:var(--ink-soft);
+}
+
+/* Signature */
+canvas#sigCanvas{width:100%; height:110px; background:#fff; border:1px solid var(--line); border-radius:8px; touch-action:none; display:block;}
+
+/* Report sheet (also used for print/PDF) */
+.report-sheet{background:#fff; border-radius:12px; box-shadow:var(--shadow); padding:20px; margin-top:12px;}
+.report-head{display:flex; align-items:center; gap:12px; border-bottom:2px solid var(--navy); padding-bottom:12px; margin-bottom:14px;}
+.report-head .badge{width:44px; height:44px; font-size:14px;}
+.report-head h1{font-size:17px; margin:0;}
+.report-head .rng{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+.summary-table{width:100%; border-collapse:collapse; margin-bottom:16px; font-size:12.5px;}
+.summary-table th{background:var(--navy); color:#fff; text-align:left; padding:6px 8px; font-size:11px; text-transform:uppercase;}
+.summary-table td{padding:6px 8px; border-bottom:1px solid var(--line);}
+.record-block{border:1px solid var(--line); border-radius:9px; padding:12px; margin-bottom:12px; break-inside:avoid;}
+.record-block .rb-head{display:flex; justify-content:space-between; font-weight:700; font-size:13px; margin-bottom:6px;}
+.record-block .rb-head .type-tag{font-size:9.5px;}
+
+.hint{font-size:11.5px; color:var(--ink-soft); background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:9px 11px; margin-top:8px;}
+
+@media (max-width:420px){
+  .grid{grid-template-columns:repeat(2,1fr);}
+  .detail-grid{grid-template-columns:1fr;}
+}
+
+@media print{
+  body{background:#fff;}
+  .no-print{display:none !important;}
+  .container{max-width:none; padding:0;}
+  .report-sheet{box-shadow:none; padding:6px;}
+  .record-block{break-inside:avoid;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="login-wrap">
+  <div class="login-card">
+    <div class="badge">SLB</div>
+    <h1 id="loginTitle">Physical Security</h1>
+    <p id="loginSub">Select your name to sign in</p>
+
+    <div id="setupBlock" class="hidden">
+      <div class="field"><label>Your Name</label><input type="text" id="setupName" placeholder="Full name"></div>
+      <div class="field"><label>Role</label>
+        <select id="setupRole"><option>Supervisor</option><option>Guard</option><option>Admin</option></select>
+      </div>
+      <div class="field"><label>Set a 4-digit PIN</label><input type="password" id="setupPin" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+      <button class="btn btn-navy btn-block" id="setupCreateBtn">Create Account</button>
+    </div>
+
+    <div id="userListBlock">
+      <div class="user-list" id="userList"></div>
+      <button class="link-btn" id="addUserLink">+ Add a user</button>
+    </div>
+
+    <div id="pinBlock" class="hidden">
+      <p style="font-weight:700; margin-bottom:4px;" id="pinForName"></p>
+      <div class="pin-dots" id="pinDots"></div>
+      <div class="keypad" id="keypad"></div>
+      <button class="link-btn" id="backToUsersLink" style="margin-top:14px;">&larr; Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="appShell" class="hidden">
+  <div class="topbar">
+    <div class="brand">
+      <div class="badge">SLB</div>
+      <div class="brand-text">Physical Security<small id="sessionInfo"></small></div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="homeBtn">Home</button>
+      <button class="icon-btn warn" id="logoutBtn">Logout</button>
+    </div>
+  </div>
+  <div class="container">
+
+    <!-- HOME -->
+    <div id="view-home">
+      <div class="section-title">Log New Activity</div>
+      <div class="grid" id="typeTiles"></div>
+
+      <div class="section-title">Manage</div>
+      <div class="grid">
+        <div class="tile" data-nav="log"><div class="ico">≣</div><div class="lbl">Activity Log</div></div>
+        <div class="tile" data-nav="reports"><div class="ico">▤</div><div class="lbl">Reports</div></div>
+        <div class="tile" data-nav="users"><div class="ico">◎</div><div class="lbl">Users</div></div>
+        <div class="tile" data-nav="bits"><div class="ico">⚑</div><div class="lbl">Bits / Posts</div></div>
+      </div>
+
+      <div class="section-title">Recent Activity</div>
+      <div id="recentList"></div>
+    </div>
+
+    <!-- FORM -->
+    <div id="view-form" class="hidden">
+      <div class="card">
+        <h2 id="formTitle">New Activity</h2>
+        <div class="sub">Fields marked are captured at the time of logging.</div>
+        <div id="formFields"></div>
+
+        <div class="field"><label>Photo Evidence</label>
+          <div class="photo-thumbs" id="photoThumbs"></div>
+          <input type="file" id="photoInput" accept="image/*" capture="environment" multiple style="display:none;">
+        </div>
+
+        <div class="field"><label>Signature</label>
+          <canvas id="sigCanvas"></canvas>
+          <div style="display:flex; justify-content:space-between; margin-top:6px;">
+            <span class="hint" style="margin:0;">Sign to confirm this record</span>
+            <button class="btn btn-outline btn-small" id="clearSigBtn">Clear</button>
+          </div>
+        </div>
+        <div class="field"><label>Signed By</label><input type="text" id="signerNameInput"></div>
+
+        <button class="btn btn-navy btn-block" id="saveActivityBtn" style="margin-top:6px;">Save Record</button>
+        <button class="btn btn-outline btn-block" id="cancelFormBtn" style="margin-top:8px;">Cancel</button>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div id="view-log" class="hidden">
+      <div class="card">
+        <h2>Activity Log</h2>
+        <div class="filters">
+          <select id="filterType"><option value="">All Types</option></select>
+          <input type="date" id="filterFrom">
+          <input type="date" id="filterTo">
+        </div>
+        <input type="text" id="filterSearch" placeholder="Search supervisor, guard, notes..." style="width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; margin-bottom:4px;">
+      </div>
+      <div id="logList"></div>
+    </div>
+
+    <!-- REPORTS -->
+    <div id="view-reports" class="hidden">
+      <div class="card">
+        <h2>Build a Report</h2>
+        <div class="sub">Choose a range and type, then generate a summary you can export.</div>
+        <div class="filters">
+          <select id="repType"><option value="">All Types</option></select>
+          <input type="date" id="repFrom">
+          <input type="date" id="repTo">
+        </div>
+        <button class="btn btn-navy btn-block" id="genReportBtn">Generate Report</button>
+      </div>
+      <div id="reportOutput"></div>
+    </div>
+
+    <!-- USERS -->
+    <div id="view-users" class="hidden">
+      <div class="card">
+        <h2>Users</h2>
+        <div class="sub">Anyone who logs activities on this device.</div>
+        <div id="usersMgmtList"></div>
+        <hr style="border:none; border-top:1px solid var(--line); margin:14px 0;">
+        <div class="field"><label>Name</label><input type="text" id="newUserName"></div>
+        <div class="field"><label>Role</label>
+          <select id="newUserRole"><option>Supervisor</option><option>Guard</option><option>Admin</option></select>
+        </div>
+        <div class="field"><label>4-digit PIN</label><input type="password" id="newUserPin" maxlength="4" inputmode="numeric"></div>
+        <button class="btn btn-navy btn-block" id="addUserBtn">Add User</button>
+      </div>
+    </div>
+
+    <!-- BITS / POSTS -->
+    <div id="view-bits" class="hidden">
+      <div class="card">
+        <h2>Bits / Posts</h2>
+        <div class="sub">This fixed list is what guards get posted to in the Posting roster — keep it consistent across shifts.</div>
+        <div id="bitsMgmtList"></div>
+        <hr style="border:none; border-top:1px solid var(--line); margin:14px 0;">
+        <div class="field"><label>New Bit / Post Name</label><input type="text" id="newBitName" placeholder="e.g. Gate A, Warehouse, Perimeter"></div>
+        <button class="btn btn-navy btn-block" id="addBitBtn">Add Bit</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Activity detail overlay -->
+<div class="overlay no-print" id="detailOverlay">
+  <div class="panel" id="detailPanel"></div>
+</div>
+
+<footer style="text-align:center; font-size:11px; color:#6b7480; padding:10px; max-width:640px; margin:0 auto;" class="no-print">
+  Works fully offline once loaded. All data stays on this device (IndexedDB).
+</footer>
+
+<script>
+(function(){
+
+// ---------- Activity type config ----------
+const TYPES = [
+  {key:'patrol', label:'Patrol', icon:'P', fields:[
+    {name:'route', label:'Route / Beat Covered', type:'text'},
+    {name:'findings', label:'Findings / Observations', type:'textarea'}
+  ]},
+  {key:'handover', label:'Handover', icon:'H', fields:[
+    {name:'outgoing', label:'Outgoing Officer', type:'text'},
+    {name:'incoming', label:'Incoming Officer', type:'text'},
+    {name:'itemsHandedOver', label:'Items / Keys Handed Over', type:'textarea'},
+    {name:'condition', label:'Condition / Remarks', type:'textarea'}
+  ]},
+  {key:'incident', label:'Incident', icon:'!', fields:[
+    {name:'incidentType', label:'Incident Type', type:'text'},
+    {name:'location', label:'Location', type:'text'},
+    {name:'severity', label:'Severity', type:'select', options:['Low','Medium','High','Critical']},
+    {name:'description', label:'Description', type:'textarea'},
+    {name:'actionTaken', label:'Action Taken', type:'textarea'}
+  ]},
+  {key:'report', label:'General Report', icon:'R', fields:[
+    {name:'title', label:'Title', type:'text'},
+    {name:'body', label:'Details', type:'textarea'}
+  ]},
+  {key:'observation', label:'Observation', icon:'O', fields:[
+    {name:'location', label:'Location', type:'text'},
+    {name:'observation', label:'Observation', type:'textarea'}
+  ]},
+  {key:'itemdeclaration', label:'Item Declaration', icon:'D', fields:[
+    {name:'itemName', label:'Item Name', type:'text'},
+    {name:'ownerName', label:'Owner / Bearer', type:'text'},
+    {name:'direction', label:'Direction', type:'select', options:['In','Out']},
+    {name:'description', label:'Description', type:'textarea'}
+  ]},
+  {key:'gatepass', label:'Gate Pass', icon:'G', fields:[
+    {name:'visitorName', label:'Visitor / Vehicle', type:'text'},
+    {name:'purpose', label:'Purpose of Visit', type:'text'},
+    {name:'timeIn', label:'Time In', type:'time'},
+    {name:'timeOut', label:'Time Out', type:'time'},
+    {name:'authorizedBy', label:'Authorized By', type:'text'}
+  ]},
+  {key:'attendance', label:'Attendance', icon:'A', fields:[
+    {name:'staffName', label:'Staff Name', type:'text'},
+    {name:'timeIn', label:'Time In', type:'time'},
+    {name:'timeOut', label:'Time Out', type:'time'},
+    {name:'status', label:'Status', type:'select', options:['Present','Absent','Late','On Leave']}
+  ]},
+  {key:'posting', label:'Posting', icon:'B', roster:true, fields:[]}
+];
+function typeCfg(key){ return TYPES.find(t=>t.key===key); }
+
+// ---------- IndexedDB helper ----------
+let db = null;
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open('slb_physec_db', 2);
+    req.onupgradeneeded = function(e){
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains('users')) d.createObjectStore('users', {keyPath:'id'});
+      if(!d.objectStoreNames.contains('activities')) d.createObjectStore('activities', {keyPath:'id'});
+      if(!d.objectStoreNames.contains('bits')) d.createObjectStore('bits', {keyPath:'id'});
+    };
+    req.onsuccess = function(e){ db = e.target.result; resolve(db); };
+    req.onerror = function(e){ reject(e); };
+  });
+}
+function idbGetAll(store){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(store,'readonly').objectStore(store).getAll();
+    tx.onsuccess = ()=>resolve(tx.result || []);
+    tx.onerror = reject;
+  });
+}
+function idbPut(store, obj){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(store,'readwrite').objectStore(store).put(obj);
+    tx.onsuccess = ()=>resolve(obj);
+    tx.onerror = reject;
+  });
+}
+function idbDelete(store, id){
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(store,'readwrite').objectStore(store).delete(id);
+    tx.onsuccess = ()=>resolve();
+    tx.onerror = reject;
+  });
+}
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function nowTime(){ const d=new Date(); return d.toTimeString().slice(0,5); }
+
+// ---------- App state ----------
+let currentUser = null;
+let users = [];
+let activities = [];
+let bits = [];
+let activeTypeKey = null;
+let editingId = null;
+let photoBuffer = [];
+let pinBuffer = '';
+let pinTargetUser = null;
+
+// ---------- Boot ----------
+idbOpen().then(async ()=>{
+  users = await idbGetAll('users');
+  activities = await idbGetAll('activities');
+  bits = await idbGetAll('bits');
+  buildTypeUI();
+  if(users.length === 0){
+    showSetup();
+  }else{
+    renderUserList();
+  }
+  const restored = sessionStorage.getItem('slb_session_user');
+  if(restored){
+    const u = users.find(x=>x.id===restored);
+    if(u) loginAs(u);
+  }
+});
+
+function showSetup(){
+  document.getElementById('setupBlock').classList.remove('hidden');
+  document.getElementById('userListBlock').classList.add('hidden');
+  document.getElementById('loginSub').textContent = 'No users yet — create the first account';
+}
+document.getElementById('addUserLink').addEventListener('click', function(){
+  document.getElementById('setupBlock').classList.remove('hidden');
+  document.getElementById('userListBlock').classList.add('hidden');
+});
+document.getElementById('setupCreateBtn').addEventListener('click', async function(){
+  const name = document.getElementById('setupName').value.trim();
+  const role = document.getElementById('setupRole').value;
+  const pin = document.getElementById('setupPin').value.trim();
+  if(!name || pin.length!==4){ alert('Enter a name and a 4-digit PIN.'); return; }
+  const u = {id:uid(), name:name, role:role, pin:pin, createdAt:Date.now()};
+  await idbPut('users', u);
+  users.push(u);
+  document.getElementById('setupBlock').classList.add('hidden');
+  document.getElementById('userListBlock').classList.remove('hidden');
+  document.getElementById('setupName').value=''; document.getElementById('setupPin').value='';
+  renderUserList();
+  loginAs(u);
+});
+
+function renderUserList(){
+  const list = document.getElementById('userList');
+  list.innerHTML = '';
+  users.forEach(function(u){
+    const row = document.createElement('div');
+    row.className = 'user-pick';
+    row.innerHTML = '<span>'+escapeHtml(u.name)+'</span><span class="role">'+escapeHtml(u.role)+'</span>';
+    row.addEventListener('click', function(){ startPinEntry(u); });
+    list.appendChild(row);
+  });
+}
+
+function startPinEntry(u){
+  pinTargetUser = u; pinBuffer = '';
+  document.getElementById('userListBlock').classList.add('hidden');
+  document.getElementById('pinBlock').classList.remove('hidden');
+  document.getElementById('pinForName').textContent = 'PIN for ' + u.name;
+  renderPinDots();
+  buildKeypad();
+}
+document.getElementById('backToUsersLink').addEventListener('click', function(){
+  document.getElementById('pinBlock').classList.add('hidden');
+  document.getElementById('userListBlock').classList.remove('hidden');
+});
+function renderPinDots(){
+  const dots = document.getElementById('pinDots');
+  dots.innerHTML = '';
+  for(let i=0;i<4;i++){
+    const d = document.createElement('div');
+    d.className = 'pin-dot' + (i < pinBuffer.length ? ' filled' : '');
+    dots.appendChild(d);
+  }
+}
+function buildKeypad(){
+  const kp = document.getElementById('keypad');
+  kp.innerHTML = '';
+  ['1','2','3','4','5','6','7','8','9','','0','⌫'].forEach(function(k){
+    const b = document.createElement('button');
+    if(k===''){ b.style.visibility='hidden'; b.textContent=''; }
+    else{
+      b.textContent = k;
+      if(k==='⌫') b.classList.add('wide');
+      b.addEventListener('click', function(){
+        if(k==='⌫'){ pinBuffer = pinBuffer.slice(0,-1); }
+        else if(pinBuffer.length<4){ pinBuffer += k; }
+        renderPinDots();
+        if(pinBuffer.length===4) checkPin();
+      });
+    }
+    kp.appendChild(b);
+  });
+}
+function checkPin(){
+  if(pinTargetUser.pin === pinBuffer){
+    loginAs(pinTargetUser);
+  }else{
+    setTimeout(function(){
+      pinBuffer='';
+      renderPinDots();
+      alert('Incorrect PIN. Try again.');
+    }, 150);
+  }
+}
+
+function loginAs(u){
+  currentUser = u;
+  sessionStorage.setItem('slb_session_user', u.id);
+  document.getElementById('view-login').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  document.getElementById('sessionInfo').textContent = u.name + ' · ' + u.role;
+  document.getElementById('signerNameInput').value = u.name;
+  goHome();
+}
+document.getElementById('logoutBtn').addEventListener('click', function(){
+  sessionStorage.removeItem('slb_session_user');
+  currentUser = null;
+  document.getElementById('appShell').classList.add('hidden');
+  document.getElementById('view-login').classList.remove('hidden');
+  document.getElementById('pinBlock').classList.add('hidden');
+  document.getElementById('userListBlock').classList.remove('hidden');
+});
+
+// ---------- Navigation ----------
+function showView(id){
+  ['view-home','view-form','view-log','view-reports','view-users','view-bits'].forEach(function(v){
+    document.getElementById(v).classList.toggle('hidden', v!==id);
+  });
+}
+document.getElementById('homeBtn').addEventListener('click', goHome);
+function goHome(){
+  showView('view-home');
+  renderRecent();
+}
+document.querySelectorAll('.tile[data-nav]').forEach(function(t){
+  t.addEventListener('click', function(){
+    const nav = t.getAttribute('data-nav');
+    if(nav==='log'){ showView('view-log'); renderLog(); }
+    if(nav==='reports'){ showView('view-reports'); }
+    if(nav==='users'){ showView('view-users'); renderUsersMgmt(); }
+    if(nav==='bits'){ showView('view-bits'); renderBitsMgmt(); }
+  });
+});
+
+function buildTypeUI(){
+  const tiles = document.getElementById('typeTiles');
+  tiles.innerHTML = '';
+  TYPES.forEach(function(t){
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.innerHTML = '<div class="ico">'+t.icon+'</div><div class="lbl">'+t.label+'</div>';
+    el.addEventListener('click', function(){ openForm(t.key); });
+    tiles.appendChild(el);
+  });
+  const filterType = document.getElementById('filterType');
+  const repType = document.getElementById('repType');
+  TYPES.forEach(function(t){
+    const o1 = document.createElement('option'); o1.value=t.key; o1.textContent=t.label; filterType.appendChild(o1);
+    const o2 = document.createElement('option'); o2.value=t.key; o2.textContent=t.label; repType.appendChild(o2);
+  });
+}
+
+// ---------- Form ----------
+const canvas = document.getElementById('sigCanvas');
+const ctx = canvas.getContext('2d');
+let drawing=false, hasSig=false;
+function resizeSigCanvas(){
+  const ratio = window.devicePixelRatio||1;
+  const rect = canvas.getBoundingClientRect();
+  const prev = hasSig ? canvas.toDataURL() : null;
+  canvas.width = rect.width*ratio; canvas.height = rect.height*ratio;
+  ctx.scale(ratio,ratio); ctx.lineWidth=2; ctx.lineCap='round'; ctx.strokeStyle='#0F2438';
+  if(prev){ const img=new Image(); img.onload=function(){ctx.drawImage(img,0,0,rect.width,rect.height);}; img.src=prev; }
+}
+window.addEventListener('resize', resizeSigCanvas);
+function getPos(e){ const r=canvas.getBoundingClientRect(); const p=e.touches?e.touches[0]:e; return {x:p.clientX-r.left, y:p.clientY-r.top}; }
+function sigStart(e){ drawing=true; hasSig=true; const p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); }
+function sigMove(e){ if(!drawing)return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault(); }
+function sigEnd(){ drawing=false; }
+canvas.addEventListener('mousedown', sigStart); canvas.addEventListener('mousemove', sigMove); window.addEventListener('mouseup', sigEnd);
+canvas.addEventListener('touchstart', sigStart, {passive:false}); canvas.addEventListener('touchmove', sigMove, {passive:false}); canvas.addEventListener('touchend', sigEnd);
+document.getElementById('clearSigBtn').addEventListener('click', function(){
+  const r=canvas.getBoundingClientRect(); ctx.clearRect(0,0,r.width,r.height); hasSig=false;
+});
+
+document.getElementById('photoThumbs').addEventListener('click', function(e){
+  if(e.target.closest('.add-photo-btn')) document.getElementById('photoInput').click();
+});
+document.getElementById('photoInput').addEventListener('change', function(e){
+  Array.from(e.target.files).forEach(function(file){
+    const reader = new FileReader();
+    reader.onload = function(ev){ photoBuffer.push(ev.target.result); renderPhotoThumbs(); };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = '';
+});
+function renderPhotoThumbs(){
+  const wrap = document.getElementById('photoThumbs');
+  wrap.innerHTML = '';
+  photoBuffer.forEach(function(src, i){
+    const d = document.createElement('div'); d.className='photo-thumb';
+    d.innerHTML = '<img src="'+src+'"><button data-i="'+i+'">&times;</button>';
+    d.querySelector('button').addEventListener('click', function(ev){
+      ev.stopPropagation();
+      photoBuffer.splice(i,1); renderPhotoThumbs();
+    });
+    wrap.appendChild(d);
+  });
+  const add = document.createElement('div'); add.className='add-photo-btn'; add.textContent='+';
+  wrap.appendChild(add);
+}
+
+function openForm(typeKey, existing){
+  activeTypeKey = typeKey;
+  editingId = existing ? existing.id : null;
+  const cfg = typeCfg(typeKey);
+  document.getElementById('formTitle').textContent = (existing?'Edit ':'New ') + cfg.label;
+  const wrap = document.getElementById('formFields');
+  wrap.innerHTML = '';
+  wrap.appendChild(buildField('date','Date','date', existing? existing.date : todayISO()));
+  if(!cfg.roster){
+    wrap.appendChild(buildField('time','Time','time', existing? existing.time : nowTime()));
+  }
+  wrap.appendChild(buildField('supervisorName','Supervisor Name (who did the posting/logging)','text', existing? existing.supervisorName : ''));
+  if(cfg.roster){
+    wrap.appendChild(buildRosterField());
+    const existingRoster = (existing && existing.details && existing.details.roster) ? existing.details.roster : null;
+    if(existingRoster && existingRoster.length){
+      existingRoster.forEach(function(g){ addRosterRow(g.guardName, g.beat, g.time); });
+    }else{
+      addRosterRow('','',nowTime());
+      addRosterRow('','',nowTime());
+    }
+    document.getElementById('addGuardRowBtn').addEventListener('click', function(){ addRosterRow('','',nowTime()); });
+  }else{
+    cfg.fields.forEach(function(f){
+      wrap.appendChild(buildField(f.name, f.label, f.type||'text', existing && existing.details ? existing.details[f.name] : '', f.options));
+    });
+  }
+  photoBuffer = existing && existing.photos ? existing.photos.slice() : [];
+  renderPhotoThumbs();
+  const r = canvas.getBoundingClientRect(); ctx.clearRect(0,0,r.width,r.height); hasSig=false;
+  document.getElementById('signerNameInput').value = existing ? (existing.signerName||currentUser.name) : currentUser.name;
+  if(existing && existing.signature){
+    const img = new Image();
+    img.onload = function(){ ctx.drawImage(img,0,0,r.width,r.height); hasSig=true; };
+    img.src = existing.signature;
+  }
+  showView('view-form');
+  setTimeout(resizeSigCanvas, 60);
+}
+function buildField(name,label,type,value,options){
+  const f = document.createElement('div'); f.className='field';
+  let inner = '<label>'+escapeHtml(label)+'</label>';
+  if(type==='textarea'){ inner += '<textarea data-field="'+name+'">'+escapeHtml(value||'')+'</textarea>'; }
+  else if(type==='select'){
+    inner += '<select data-field="'+name+'">' + options.map(o=>'<option'+(o===value?' selected':'')+'>'+escapeHtml(o)+'</option>').join('') + '</select>';
+  } else {
+    inner += '<input type="'+type+'" data-field="'+name+'" value="'+escapeHtml(value||'')+'">';
+  }
+  f.innerHTML = inner;
+  return f;
+}
+function buildRosterField(){
+  const wrap = document.createElement('div'); wrap.className='field';
+  wrap.innerHTML =
+    '<label>Guards Posted — covers the whole facility, one row per guard</label>'+
+    '<table style="width:100%; border-collapse:collapse; font-size:13px;">'+
+    '<thead><tr>'+
+      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Guard Name</th>'+
+      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Bit / Post</th>'+
+      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Time Posted</th>'+
+      '<th></th>'+
+    '</tr></thead>'+
+    '<tbody id="rosterBody"></tbody>'+
+    '</table>'+
+    '<button type="button" class="btn btn-outline btn-small" id="addGuardRowBtn" style="margin-top:8px;">+ Add Guard</button>';
+  return wrap;
+}
+function addRosterRow(guardName, bit, time){
+  const tbody = document.getElementById('rosterBody');
+  if(!tbody) return;
+  const tr = document.createElement('tr');
+  const cellStyle = 'padding:4px; border-bottom:1px solid var(--line);';
+  const inputStyle = 'width:100%; border:1px solid var(--line); border-radius:6px; padding:6px; font-size:13px; font-family:inherit;';
+  let bitFieldHtml;
+  if(bits.length){
+    const opts = bits.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(function(b){
+      return '<option value="'+escapeHtml(b.name)+'"'+(b.name===bit?' selected':'')+'>'+escapeHtml(b.name)+'</option>';
+    }).join('');
+    bitFieldHtml = '<select class="roster-bit" style="'+inputStyle+'"><option value="">Select bit…</option>'+opts+'</select>';
+  }else{
+    bitFieldHtml = '<input type="text" class="roster-bit" style="'+inputStyle+'" placeholder="Add bits under Manage > Bits / Posts" value="'+escapeHtml(bit||'')+'">';
+  }
+  tr.innerHTML =
+    '<td style="'+cellStyle+'"><input type="text" class="roster-guard" style="'+inputStyle+'" placeholder="Guard name" value="'+escapeHtml(guardName||'')+'"></td>'+
+    '<td style="'+cellStyle+'">'+bitFieldHtml+'</td>'+
+    '<td style="'+cellStyle+'"><input type="time" class="roster-time" style="'+inputStyle+'" value="'+escapeHtml(time||nowTime())+'"></td>'+
+    '<td style="'+cellStyle+'"><button type="button" class="del-roster-row" style="background:none; border:none; color:var(--danger); font-size:16px; padding:2px 4px;">&times;</button></td>';
+  tr.querySelector('.del-roster-row').addEventListener('click', function(){ tr.remove(); });
+  tbody.appendChild(tr);
+}
+function getRosterRows(){
+  const tbody = document.getElementById('rosterBody');
+  if(!tbody) return [];
+  return Array.from(tbody.querySelectorAll('tr')).map(function(tr){
+    return {
+      guardName: tr.querySelector('.roster-guard').value.trim(),
+      beat: tr.querySelector('.roster-bit').value.trim(),
+      time: tr.querySelector('.roster-time').value
+    };
+  }).filter(r=>r.guardName || r.beat);
+}
+document.getElementById('cancelFormBtn').addEventListener('click', goHome);
+document.getElementById('saveActivityBtn').addEventListener('click', async function(){
+  const cfg = typeCfg(activeTypeKey);
+  const getVal = (name)=>{ const el = document.querySelector('#formFields [data-field="'+name+'"]'); return el?el.value:''; };
+  const details = {};
+  cfg.fields.forEach(f=>{ details[f.name] = getVal(f.name); });
+  if(cfg.roster){ details.roster = getRosterRows(); }
+  const record = {
+    id: editingId || uid(),
+    type: activeTypeKey,
+    date: getVal('date'),
+    time: getVal('time'),
+    supervisorName: getVal('supervisorName'),
+    details: details,
+    photos: photoBuffer.slice(),
+    signature: hasSig ? canvas.toDataURL() : null,
+    signerName: document.getElementById('signerNameInput').value.trim() || currentUser.name,
+    loggedBy: currentUser.name,
+    createdAt: editingId ? (activities.find(a=>a.id===editingId)||{}).createdAt || Date.now() : Date.now()
+  };
+  await idbPut('activities', record);
+  const idx = activities.findIndex(a=>a.id===record.id);
+  if(idx>=0) activities[idx]=record; else activities.push(record);
+  goHome();
+});
+
+// ---------- Recent / summary line ----------
+function summaryLine(rec){
+  const cfg = typeCfg(rec.type);
+  if(cfg.roster){
+    const roster = (rec.details && rec.details.roster) || [];
+    const bits = Array.from(new Set(roster.map(r=>r.beat).filter(Boolean)));
+    return roster.length + ' guard(s) posted' + (bits.length ? ' · Bits: ' + bits.join(', ') : '');
+  }
+  const firstField = cfg.fields[0];
+  const val = rec.details[firstField.name];
+  return val ? (firstField.label+': '+val) : cfg.label;
+}
+function renderRecent(){
+  const list = activities.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,6);
+  const wrap = document.getElementById('recentList');
+  wrap.innerHTML = list.length? '' : '<div class="hint">No activity logged yet.</div>';
+  list.forEach(r=> wrap.appendChild(activityRow(r)));
+}
+function rosterTableHtml(roster, cellPad){
+  const pad = cellPad || '4px';
+  return '<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;">'+
+    '<thead><tr>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Guard</th>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Bit / Post</th>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Time</th>'+
+    '</tr></thead><tbody>'+
+    (roster.length ? roster.map(function(g){
+      return '<tr><td style="padding:'+pad+'; border-bottom:1px solid var(--line);">'+escapeHtml(g.guardName||'—')+'</td>'+
+        '<td style="padding:'+pad+'; border-bottom:1px solid var(--line);">'+escapeHtml(g.beat||'—')+'</td>'+
+        '<td style="padding:'+pad+'; border-bottom:1px solid var(--line);">'+escapeHtml(g.time||'—')+'</td></tr>';
+    }).join('') : '<tr><td colspan="3" style="padding:'+pad+'; color:var(--ink-soft);">No guards added.</td></tr>')+
+    '</tbody></table>';
+}
+function activityRow(r){
+  const cfg = typeCfg(r.type);
+  const row = document.createElement('div');
+  row.className = 'act-row';
+  if(cfg.roster){
+    row.style.display = 'block';
+    const roster = (r.details && r.details.roster) || [];
+    row.innerHTML =
+      '<div><span class="type-tag">'+cfg.label+'</span>'+
+      '<div class="title-line">Facility Posting — '+escapeHtml(r.date||'')+'</div>'+
+      '<div class="meta-line">Posted by: '+escapeHtml(r.supervisorName||'—')+' · logged by '+escapeHtml(r.loggedBy||'')+'</div>'+
+      rosterTableHtml(roster)+
+      '</div>';
+    row.addEventListener('click', ()=> openDetail(r));
+    return row;
+  }
+  row.innerHTML =
+    '<div><span class="type-tag">'+cfg.label+'</span>'+
+    '<div class="title-line">'+escapeHtml(summaryLine(r))+'</div>'+
+    '<div class="meta-line">'+escapeHtml(r.date||'')+' '+escapeHtml(r.time||'')+' · Sup: '+escapeHtml(r.supervisorName||'—')+' · by '+escapeHtml(r.loggedBy||'')+'</div></div>'+
+    '<div class="chev">&rsaquo;</div>';
+  row.addEventListener('click', ()=> openDetail(r));
+  return row;
+}
+
+// ---------- Log view ----------
+['filterType','filterFrom','filterTo','filterSearch'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', renderLog);
+});
+function filteredActivities(typeSel, fromSel, toSel, searchSel){
+  const type = document.getElementById(typeSel).value;
+  const from = document.getElementById(fromSel).value;
+  const to = document.getElementById(toSel).value;
+  const search = searchSel ? document.getElementById(searchSel).value.toLowerCase() : '';
+  return activities.filter(function(r){
+    if(type && r.type!==type) return false;
+    if(from && r.date < from) return false;
+    if(to && r.date > to) return false;
+    if(search){
+      const hay = (r.supervisorName+' '+r.loggedBy+' '+JSON.stringify(r.details)).toLowerCase();
+      if(hay.indexOf(search)===-1) return false;
+    }
+    return true;
+  }).sort((a,b)=>b.createdAt-a.createdAt);
+}
+function renderLog(){
+  const list = filteredActivities('filterType','filterFrom','filterTo','filterSearch');
+  const wrap = document.getElementById('logList');
+  wrap.innerHTML = list.length? '' : '<div class="hint">No records match these filters.</div>';
+  list.forEach(r=> wrap.appendChild(activityRow(r)));
+}
+
+// ---------- Detail overlay ----------
+const detailOverlay = document.getElementById('detailOverlay');
+function openDetail(r){
+  const cfg = typeCfg(r.type);
+  let rows = '';
+  if(cfg.roster){
+    const roster = (r.details && r.details.roster) || [];
+    rows = '<div style="grid-column:1 / -1;">'+rosterTableHtml(roster,'6px')+'</div>';
+  }else{
+    cfg.fields.forEach(function(f){
+      rows += '<div><div class="dg-label">'+escapeHtml(f.label)+'</div><div>'+escapeHtml(r.details[f.name]||'—')+'</div></div>';
+    });
+  }
+  let photosHtml = '';
+  if(r.photos && r.photos.length){
+    photosHtml = '<div class="photo-grid">'+r.photos.map(p=>'<img src="'+p+'">').join('')+'</div>';
+  }
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML =
+    '<div class="panel-head"><span class="type-tag">'+cfg.label+'</span><button class="btn btn-outline btn-small" id="closeDetailBtn">Close</button></div>'+
+    '<div class="detail-grid"><div><div class="dg-label">Date</div><div>'+escapeHtml(r.date)+' '+escapeHtml(r.time||'')+'</div></div>'+
+    '<div><div class="dg-label">Supervisor</div><div>'+escapeHtml(r.supervisorName||'—')+'</div></div>'+
+    rows+
+    '<div><div class="dg-label">Logged By</div><div>'+escapeHtml(r.loggedBy||'')+'</div></div></div>'+
+    photosHtml+
+    (r.signature? '<div class="dg-label" style="margin-top:10px;">Signature — '+escapeHtml(r.signerName||'')+'</div><img class="sig-img" src="'+r.signature+'">' : '')+
+    '<div style="display:flex; gap:8px; margin-top:16px;">'+
+      '<button class="btn btn-outline btn-block" id="editDetailBtn">Edit</button>'+
+      '<button class="btn btn-danger-outline btn-block" id="delDetailBtn">Delete</button>'+
+    '</div>';
+  panel.querySelector('#closeDetailBtn').addEventListener('click', ()=>detailOverlay.classList.remove('open'));
+  panel.querySelector('#editDetailBtn').addEventListener('click', function(){
+    detailOverlay.classList.remove('open');
+    openForm(r.type, r);
+  });
+  panel.querySelector('#delDetailBtn').addEventListener('click', async function(){
+    if(!confirm('Delete this record? This cannot be undone.')) return;
+    await idbDelete('activities', r.id);
+    activities = activities.filter(a=>a.id!==r.id);
+    detailOverlay.classList.remove('open');
+    renderLog(); renderRecent();
+  });
+  detailOverlay.classList.add('open');
+}
+detailOverlay.addEventListener('click', function(e){ if(e.target===detailOverlay) detailOverlay.classList.remove('open'); });
+
+// ---------- Users management ----------
+function renderUsersMgmt(){
+  const wrap = document.getElementById('usersMgmtList');
+  wrap.innerHTML = '';
+  users.forEach(function(u){
+    const row = document.createElement('div');
+    row.className = 'user-pick';
+    row.style.marginBottom='8px';
+    row.innerHTML = '<span>'+escapeHtml(u.name)+' <span class="role">('+escapeHtml(u.role)+')</span></span>'+
+      (u.id!==currentUser.id ? '<button class="btn btn-small btn-danger-outline" data-del="'+u.id+'">Remove</button>' : '<span class="role">You</span>');
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('[data-del]').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      const id = btn.getAttribute('data-del');
+      if(!confirm('Remove this user?')) return;
+      await idbDelete('users', id);
+      users = users.filter(u=>u.id!==id);
+      renderUsersMgmt();
+    });
+  });
+}
+document.getElementById('addUserBtn').addEventListener('click', async function(){
+  const name = document.getElementById('newUserName').value.trim();
+  const role = document.getElementById('newUserRole').value;
+  const pin = document.getElementById('newUserPin').value.trim();
+  if(!name || pin.length!==4){ alert('Enter a name and a 4-digit PIN.'); return; }
+  const u = {id:uid(), name:name, role:role, pin:pin, createdAt:Date.now()};
+  await idbPut('users', u);
+  users.push(u);
+  document.getElementById('newUserName').value=''; document.getElementById('newUserPin').value='';
+  renderUsersMgmt();
+});
+
+// ---------- Bits / Posts management ----------
+function renderBitsMgmt(){
+  const wrap = document.getElementById('bitsMgmtList');
+  wrap.innerHTML = '';
+  if(!bits.length){
+    wrap.innerHTML = '<div class="hint">No bits added yet. Add your facility\'s posts/bits below (e.g. Gate A, Warehouse, Perimeter).</div>';
+    return;
+  }
+  bits.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(function(b){
+    const row = document.createElement('div');
+    row.className = 'user-pick';
+    row.style.marginBottom = '8px';
+    row.innerHTML = '<span>'+escapeHtml(b.name)+'</span><button class="btn btn-small btn-danger-outline" data-delbit="'+b.id+'">Remove</button>';
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('[data-delbit]').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      const id = btn.getAttribute('data-delbit');
+      if(!confirm('Remove this bit/post from the list?')) return;
+      await idbDelete('bits', id);
+      bits = bits.filter(b=>b.id!==id);
+      renderBitsMgmt();
+    });
+  });
+}
+document.getElementById('addBitBtn').addEventListener('click', async function(){
+  const name = document.getElementById('newBitName').value.trim();
+  if(!name){ alert('Enter a bit/post name.'); return; }
+  if(bits.some(b=>b.name.toLowerCase()===name.toLowerCase())){ alert('That bit already exists.'); return; }
+  const b = {id:uid(), name:name, createdAt:Date.now()};
+  await idbPut('bits', b);
+  bits.push(b);
+  document.getElementById('newBitName').value='';
+  renderBitsMgmt();
+});
+
+// ---------- Reports ----------
+document.getElementById('genReportBtn').addEventListener('click', function(){
+  const list = filteredActivities('repType','repFrom','repTo', null);
+  const from = document.getElementById('repFrom').value || '—';
+  const to = document.getElementById('repTo').value || '—';
+  const counts = {};
+  list.forEach(r=>{ counts[r.type] = (counts[r.type]||0)+1; });
+  let summaryRows = TYPES.map(t=> counts[t.key] ? '<tr><td>'+t.label+'</td><td>'+counts[t.key]+'</td></tr>' : '').join('');
+  if(!summaryRows) summaryRows = '<tr><td colspan="2">No records in this range.</td></tr>';
+
+  let recordsHtml = list.sort((a,b)=>a.createdAt-b.createdAt).map(function(r){
+    const cfg = typeCfg(r.type);
+    let bodyHtml;
+    if(cfg.roster){
+      const roster = (r.details && r.details.roster) || [];
+      bodyHtml = rosterTableHtml(roster,'5px');
+    }else{
+      let fieldRows = cfg.fields.map(f=>'<div><div class="dg-label">'+escapeHtml(f.label)+'</div><div>'+escapeHtml(r.details[f.name]||'—')+'</div></div>').join('');
+      bodyHtml = '<div class="detail-grid">'+fieldRows+'</div>';
+    }
+    let photosHtml = (r.photos&&r.photos.length) ? '<div class="photo-grid">'+r.photos.map(p=>'<img src="'+p+'">').join('')+'</div>' : '';
+    let sigHtml = r.signature ? '<div class="dg-label" style="margin-top:6px;">Signature — '+escapeHtml(r.signerName||'')+'</div><img class="sig-img" src="'+r.signature+'">' : '';
+    return '<div class="record-block">'+
+      '<div class="rb-head"><span><span class="type-tag">'+cfg.label+'</span> '+escapeHtml(r.date)+' '+escapeHtml(r.time||'')+'</span><span>Sup: '+escapeHtml(r.supervisorName||'—')+'</span></div>'+
+      bodyHtml+photosHtml+sigHtml+
+      '</div>';
+  }).join('');
+
+  const html =
+    '<div class="report-sheet" id="reportSheet">'+
+      '<div class="report-head"><div class="badge">SLB</div><div><h1>Physical Security Activity Report</h1>'+
+      '<div class="rng">Range: '+escapeHtml(from)+' to '+escapeHtml(to)+' &nbsp;·&nbsp; Generated by '+escapeHtml(currentUser.name)+' on '+escapeHtml(new Date().toLocaleString())+'</div></div></div>'+
+      '<table class="summary-table"><thead><tr><th>Activity Type</th><th>Count</th></tr></thead><tbody>'+summaryRows+'</tbody></table>'+
+      (recordsHtml || '<div class="hint">No detailed records to display.</div>')+
+    '</div>'+
+    '<div class="no-print" style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">'+
+      '<button class="btn btn-amber" id="exportPdfBtn">Export PDF</button>'+
+      '<button class="btn btn-outline" id="exportCsvBtn">Export CSV</button>'+
+      '<button class="btn btn-outline" id="shareBtn">Share / Email</button>'+
+    '</div>'+
+    '<div class="hint no-print">Export PDF opens your device print dialog — choose "Save as PDF". Share/Email uses your device share sheet where available; otherwise it opens a draft email you can attach the exported file to manually.</div>';
+
+  document.getElementById('reportOutput').innerHTML = html;
+  document.getElementById('exportPdfBtn').addEventListener('click', ()=>window.print());
+  document.getElementById('exportCsvBtn').addEventListener('click', ()=>exportCsv(list));
+  document.getElementById('shareBtn').addEventListener('click', ()=>shareReport(list, from, to, counts));
+});
+
+function exportCsv(list){
+  const cols = ['id','type','date','time','supervisorName','loggedBy','signerName','photoCount','hasSignature','details'];
+  const rows = [cols.join(',')];
+  list.forEach(function(r){
+    const vals = [
+      r.id, r.type, r.date, r.time, r.supervisorName, r.loggedBy, r.signerName,
+      (r.photos?r.photos.length:0), (r.signature?'yes':'no'),
+      JSON.stringify(r.details).replace(/"/g,'""')
+    ];
+    rows.push(vals.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(','));
+  });
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'slb-security-report-'+todayISO()+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function shareReport(list, from, to, counts){
+  const summaryText = 'SLB Physical Security Report\nRange: '+from+' to '+to+'\nGenerated by '+currentUser.name+'\n\n'+
+    TYPES.filter(t=>counts[t.key]).map(t=>t.label+': '+counts[t.key]).join('\n');
+  try{
+    const cols = ['id','type','date','time','supervisorName','loggedBy'];
+    const rows = [cols.join(',')].concat(list.map(r=>[r.id,r.type,r.date,r.time,r.supervisorName,r.loggedBy].join(',')));
+    const csvBlob = new Blob([rows.join('\n')], {type:'text/csv'});
+    const file = new File([csvBlob], 'slb-security-report.csv', {type:'text/csv'});
+    if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({title:'SLB Physical Security Report', text: summaryText, files:[file]});
+      return;
+    }
+    if(navigator.share){
+      await navigator.share({title:'SLB Physical Security Report', text: summaryText});
+      return;
+    }
+  }catch(e){ /* fall through to mailto */ }
+  const body = encodeURIComponent(summaryText + '\n\n(Attach the exported PDF/CSV file to this email before sending.)');
+  window.location.href = 'mailto:?subject=' + encodeURIComponent('SLB Physical Security Report') + '&body=' + body;
+}
+
+})();
+</script>
+</body>
+</html>
