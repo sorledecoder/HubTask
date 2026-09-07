@@ -252,6 +252,7 @@ body.is-printing .no-print{display:none !important;}
           </div>
         </div>
         <div class="field"><label>Signed By</label><input type="text" id="signerNameInput"></div>
+        <div class="field"><label>Position / Title (e.g. ACO, Supervisor)</label><input type="text" id="signerPositionInput"></div>
 
         <button class="btn btn-navy btn-block" id="saveActivityBtn" style="margin-top:6px;">Save Record</button>
         <button class="btn btn-outline btn-block" id="cancelFormBtn" style="margin-top:8px;">Cancel</button>
@@ -600,6 +601,7 @@ function loginAs(u){
   document.getElementById('appShell').classList.remove('hidden');
   document.getElementById('sessionInfo').textContent = u.name + ' · ' + u.role;
   document.getElementById('signerNameInput').value = u.name;
+  document.getElementById('signerPositionInput').value = u.role;
   goHome();
 }
 document.getElementById('logoutBtn').addEventListener('click', function(){
@@ -758,6 +760,7 @@ function openForm(typeKey, existing){
   renderPhotoThumbs();
   const r = canvas.getBoundingClientRect(); ctx.clearRect(0,0,r.width,r.height); hasSig=false;
   document.getElementById('signerNameInput').value = existing ? (existing.signerName||currentUser.name) : currentUser.name;
+  document.getElementById('signerPositionInput').value = existing ? (existing.signerPosition||currentUser.role) : currentUser.role;
   if(existing && existing.signature){
     const img = new Image();
     img.onload = function(){ ctx.drawImage(img,0,0,r.width,r.height); hasSig=true; };
@@ -971,6 +974,7 @@ document.getElementById('saveActivityBtn').addEventListener('click', async funct
     photos: photoBuffer.slice(),
     signature: hasSig ? canvas.toDataURL() : null,
     signerName: document.getElementById('signerNameInput').value.trim() || currentUser.name,
+    signerPosition: document.getElementById('signerPositionInput').value.trim() || '',
     loggedBy: currentUser.name,
     createdAt: editingId ? (activities.find(a=>a.id===editingId)||{}).createdAt || Date.now() : Date.now()
   };
@@ -1032,7 +1036,7 @@ function activityRow(r){
   row.innerHTML =
     '<div><span class="type-tag">'+cfg.label+'</span>'+
     '<div class="title-line">'+escapeHtml(summaryLine(r))+'</div>'+
-    '<div class="meta-line">'+escapeHtml(r.date||'')+' '+escapeHtml(r.time||'')+' · Sup: '+escapeHtml(r.supervisorName||'—')+' · by '+escapeHtml(r.loggedBy||'')+'</div></div>'+
+    '<div class="meta-line">'+escapeHtml(r.date||'')+' '+escapeHtml(r.time||'')+' · Supervisor: '+escapeHtml(r.supervisorName||'—')+' · by '+escapeHtml(r.loggedBy||'')+'</div></div>'+
     '<div class="chev">&rsaquo;</div>';
   row.addEventListener('click', ()=> openDetail(r));
   return row;
@@ -1094,7 +1098,7 @@ function openDetail(r){
     rows+
     '<div><div class="dg-label">Logged By</div><div>'+escapeHtml(r.loggedBy||'')+'</div></div></div>'+
     photosHtml+
-    (r.signature? '<div class="dg-label" style="margin-top:10px;">Signature — '+escapeHtml(r.signerName||'')+'</div><img class="sig-img" src="'+r.signature+'">' : '')+
+    (r.signature? '<div class="dg-label" style="margin-top:10px;">Signature — '+escapeHtml(r.signerName||'')+(r.signerPosition? ' · '+escapeHtml(r.signerPosition) : '')+'</div><img class="sig-img" src="'+r.signature+'">' : '')+
     '<div style="display:flex; gap:8px; margin-top:16px;">'+
       '<button class="btn btn-outline btn-block" id="editDetailBtn">Edit</button>'+
       '<button class="btn btn-danger-outline btn-block" id="delDetailBtn">Delete</button>'+
@@ -1290,9 +1294,9 @@ document.getElementById('genReportBtn').addEventListener('click', function(){
       }
     }
     let photosHtml = (r.photos&&r.photos.length) ? '<div class="photo-grid">'+r.photos.map(p=>'<img src="'+p+'">').join('')+'</div>' : '';
-    let sigHtml = r.signature ? '<div class="dg-label" style="margin-top:6px;">Signature — '+escapeHtml(r.signerName||'')+'</div><img class="sig-img" src="'+r.signature+'">' : '';
+    let sigHtml = r.signature ? '<div class="dg-label" style="margin-top:6px;">Signature — '+escapeHtml(r.signerName||'')+(r.signerPosition? ' · '+escapeHtml(r.signerPosition) : '')+'</div><img class="sig-img" src="'+r.signature+'">' : '';
     return '<div class="record-block">'+
-      '<div class="rb-head"><span><span class="type-tag">'+cfg.label+'</span> '+escapeHtml(r.date)+' '+escapeHtml(r.time||'')+'</span><span>Sup: '+escapeHtml(r.supervisorName||'—')+'</span></div>'+
+      '<div class="rb-head"><span><span class="type-tag">'+cfg.label+'</span> '+escapeHtml(r.date)+' '+escapeHtml(r.time||'')+'</span><span>Supervisor: '+escapeHtml(r.supervisorName||'—')+'</span></div>'+
       bodyHtml+photosHtml+sigHtml+
       '</div>';
   }).join('');
