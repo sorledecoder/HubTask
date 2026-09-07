@@ -116,7 +116,7 @@ button{font-family:inherit; cursor:pointer;}
 .panel{background:#fff; width:100%; max-width:560px; max-height:88vh; overflow-y:auto; border-radius:16px 16px 0 0; padding:18px 16px 22px; box-shadow:0 -8px 30px rgba(0,0,0,0.3);}
 .panel-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; position:sticky; top:0; background:#fff; padding-bottom:6px;}
 .detail-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px; margin:10px 0;}
-.detail-grid .dg-label{color:var(--ink-soft); font-size:11px; text-transform:uppercase; letter-spacing:0.4px;}
+.detail-grid .dg-label{color:var(--ink-soft); font-size:11px; text-transform:uppercase; letter-spacing:0.4px; font-weight:900;}
 .photo-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:10px;}
 .photo-grid img{width:100%; height:78px; object-fit:cover; border-radius:8px; border:1px solid var(--line);}
 .sig-img{max-width:220px; border:1px solid var(--line); border-radius:8px; margin-top:6px;}
@@ -164,7 +164,7 @@ canvas#sigCanvas{width:100%; height:110px; background:#fff; border:1px solid var
   .container{max-width:none; padding:0;}
   .report-sheet{box-shadow:none; padding:6px;}
   .record-block{break-inside:avoid;}
-  .report-head h1, .rb-head, .dg-label{color:#000 !important;}
+  .report-head h1, .rb-head, .dg-label{color:#000 !important; font-weight:900 !important;}
   .summary-table th{color:#000 !important; border-bottom-color:#000 !important;}
 }
 body.is-printing .no-print{display:none !important;}
@@ -820,8 +820,8 @@ function buildPeopleField(){
     '<label>People Involved</label>'+
     '<table style="width:100%; border-collapse:collapse; font-size:13px;">'+
     '<thead><tr>'+
-      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Full Name</th>'+
-      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Designation</th>'+
+      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Full Name:</th>'+
+      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Designation:</th>'+
       '<th></th>'+
     '</tr></thead>'+
     '<tbody id="peopleBody"></tbody>'+
@@ -856,8 +856,8 @@ function peopleTableHtml(people, cellPad){
   const pad = cellPad || '4px';
   return '<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;">'+
     '<thead><tr>'+
-      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Full Name</th>'+
-      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Designation</th>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Full Name:</th>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Designation:</th>'+
     '</tr></thead><tbody>'+
     (people.length ? people.map(function(p){
       return '<tr><td style="padding:'+pad+'; border-bottom:1px solid var(--line);">'+escapeHtml(p.fullName||'—')+'</td>'+
@@ -915,7 +915,7 @@ function buildRosterField(){
     '<table style="width:100%; border-collapse:collapse; font-size:13px;">'+
     '<thead><tr>'+
       '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Guard Name</th>'+
-      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Bit / Post</th>'+
+      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Bit / Post:</th>'+
       '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Time Posted</th>'+
       '<th></th>'+
     '</tr></thead>'+
@@ -1009,9 +1009,9 @@ function rosterTableHtml(roster, cellPad){
   const pad = cellPad || '4px';
   return '<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;">'+
     '<thead><tr>'+
-      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Guard</th>'+
-      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Bit / Post</th>'+
-      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Time</th>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Guard:</th>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Bit / Post:</th>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Time:</th>'+
     '</tr></thead><tbody>'+
     (roster.length ? roster.map(function(g){
       return '<tr><td style="padding:'+pad+'; border-bottom:1px solid var(--line);">'+escapeHtml(g.guardName||'—')+'</td>'+
@@ -1082,11 +1082,11 @@ function openDetail(r){
     rows = '<div style="grid-column:1 / -1;">'+rosterTableHtml(roster,'6px')+'</div>';
   }else{
     cfg.fields.forEach(function(f){
-      rows += '<div><div class="dg-label">'+escapeHtml(f.label)+'</div><div>'+escapeHtml(r.details[f.name]||'—')+'</div></div>';
+      rows += '<div><div class="dg-label">'+escapeHtml(f.label)+':</div><div>'+escapeHtml(r.details[f.name]||'—')+'</div></div>';
     });
     if(cfg.peopleInvolved){
       const people = (r.details && r.details.peopleInvolved) || [];
-      rows += '<div style="grid-column:1 / -1;"><div class="dg-label" style="margin-top:6px;">People Involved</div>'+peopleTableHtml(people,'6px')+'</div>';
+      rows += '<div style="grid-column:1 / -1;"><div class="dg-label" style="margin-top:6px;">People Involved:</div>'+peopleTableHtml(people,'6px')+'</div>';
     }
   }
   let photosHtml = '';
@@ -1096,10 +1096,10 @@ function openDetail(r){
   const panel = document.getElementById('detailPanel');
   panel.innerHTML =
     '<div class="panel-head"><span class="type-tag">'+cfg.label+'</span><button class="btn btn-outline btn-small" id="closeDetailBtn">Close</button></div>'+
-    '<div class="detail-grid"><div><div class="dg-label">Date</div><div>'+escapeHtml(r.date)+' '+escapeHtml(r.time||'')+'</div></div>'+
-    '<div><div class="dg-label">Supervisor</div><div>'+escapeHtml(r.supervisorName||'—')+'</div></div>'+
+    '<div class="detail-grid"><div><div class="dg-label">Date:</div><div>'+escapeHtml(r.date)+' '+escapeHtml(r.time||'')+'</div></div>'+
+    '<div><div class="dg-label">Supervisor:</div><div>'+escapeHtml(r.supervisorName||'—')+'</div></div>'+
     rows+
-    '<div><div class="dg-label">Logged By</div><div>'+escapeHtml(r.loggedBy||'')+'</div></div></div>'+
+    '<div><div class="dg-label">Logged By:</div><div>'+escapeHtml(r.loggedBy||'')+'</div></div></div>'+
     photosHtml+
     (r.signature? '<img class="sig-img" src="'+r.signature+'"><div class="dg-label" style="margin-top:6px;">'+escapeHtml(r.signerName||'')+(r.signerPosition? ' · '+escapeHtml(r.signerPosition) : '')+'</div>' : '')+
     '<div style="display:flex; gap:8px; margin-top:16px;">'+
@@ -1289,11 +1289,11 @@ document.getElementById('genReportBtn').addEventListener('click', function(){
       const roster = (r.details && r.details.roster) || [];
       bodyHtml = rosterTableHtml(roster,'5px');
     }else{
-      let fieldRows = cfg.fields.map(f=>'<div><div class="dg-label">'+escapeHtml(f.label)+'</div><div>'+escapeHtml(r.details[f.name]||'—')+'</div></div>').join('');
+      let fieldRows = cfg.fields.map(f=>'<div><div class="dg-label">'+escapeHtml(f.label)+':</div><div>'+escapeHtml(r.details[f.name]||'—')+'</div></div>').join('');
       bodyHtml = '<div class="detail-grid">'+fieldRows+'</div>';
       if(cfg.peopleInvolved){
         const people = (r.details && r.details.peopleInvolved) || [];
-        bodyHtml += '<div class="dg-label" style="margin-top:6px;">People Involved</div>'+peopleTableHtml(people,'5px');
+        bodyHtml += '<div class="dg-label" style="margin-top:6px;">People Involved:</div>'+peopleTableHtml(people,'5px');
       }
     }
     let photosHtml = (r.photos&&r.photos.length) ? '<div class="photo-grid">'+r.photos.map(p=>'<img src="'+p+'">').join('')+'</div>' : '';
@@ -1308,7 +1308,7 @@ document.getElementById('genReportBtn').addEventListener('click', function(){
     '<div class="report-sheet" id="reportSheet">'+
       '<div class="report-head"><div class="badge">SLB</div><div><h1>Physical Security Activity Report</h1>'+
       '<div class="rng">Range: '+escapeHtml(from)+' to '+escapeHtml(to)+' &nbsp;·&nbsp; Generated by '+escapeHtml(currentUser.name)+' on '+escapeHtml(new Date().toLocaleString())+'</div></div></div>'+
-      '<table class="summary-table"><thead><tr><th>Activity Type</th><th>Count</th></tr></thead><tbody>'+summaryRows+'</tbody></table>'+
+      '<table class="summary-table"><thead><tr><th>Activity Type:</th><th>Count:</th></tr></thead><tbody>'+summaryRows+'</tbody></table>'+
       (recordsHtml || '<div class="hint">No detailed records to display.</div>')+
     '</div>'+
     '<div class="no-print" style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">'+
