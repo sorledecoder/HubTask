@@ -1098,7 +1098,7 @@ function openDetail(r){
     rows+
     '<div><div class="dg-label">Logged By</div><div>'+escapeHtml(r.loggedBy||'')+'</div></div></div>'+
     photosHtml+
-    (r.signature? '<div class="dg-label" style="margin-top:10px;">Signature — '+escapeHtml(r.signerName||'')+(r.signerPosition? ' · '+escapeHtml(r.signerPosition) : '')+'</div><img class="sig-img" src="'+r.signature+'">' : '')+
+    (r.signature? '<img class="sig-img" src="'+r.signature+'"><div class="dg-label" style="margin-top:6px;">'+escapeHtml(r.signerName||'')+(r.signerPosition? ' · '+escapeHtml(r.signerPosition) : '')+'</div>' : '')+
     '<div style="display:flex; gap:8px; margin-top:16px;">'+
       '<button class="btn btn-outline btn-block" id="editDetailBtn">Edit</button>'+
       '<button class="btn btn-danger-outline btn-block" id="delDetailBtn">Delete</button>'+
@@ -1294,7 +1294,7 @@ document.getElementById('genReportBtn').addEventListener('click', function(){
       }
     }
     let photosHtml = (r.photos&&r.photos.length) ? '<div class="photo-grid">'+r.photos.map(p=>'<img src="'+p+'">').join('')+'</div>' : '';
-    let sigHtml = r.signature ? '<div class="dg-label" style="margin-top:6px;">Signature — '+escapeHtml(r.signerName||'')+(r.signerPosition? ' · '+escapeHtml(r.signerPosition) : '')+'</div><img class="sig-img" src="'+r.signature+'">' : '';
+    let sigHtml = r.signature ? '<img class="sig-img" src="'+r.signature+'"><div class="dg-label" style="margin-top:4px;">'+escapeHtml(r.signerName||'')+(r.signerPosition? ' · '+escapeHtml(r.signerPosition) : '')+'</div>' : '';
     return '<div class="record-block">'+
       '<div class="rb-head"><span><span class="type-tag">'+cfg.label+'</span> '+escapeHtml(r.date)+' '+escapeHtml(r.time||'')+'</span><span>Supervisor: '+escapeHtml(r.supervisorName||'—')+'</span></div>'+
       bodyHtml+photosHtml+sigHtml+
