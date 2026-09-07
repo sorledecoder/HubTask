@@ -224,6 +224,7 @@ canvas#sigCanvas{width:100%; height:110px; background:#fff; border:1px solid var
         <div class="tile" data-nav="users"><div class="ico">◎</div><div class="lbl">Users</div></div>
         <div class="tile" data-nav="bits"><div class="ico">⚑</div><div class="lbl">Bits / Posts</div></div>
         <div class="tile" data-nav="incidenttypes"><div class="ico">!</div><div class="lbl">Incident Types</div></div>
+        <div class="tile" data-nav="categories"><div class="ico">◈</div><div class="lbl">Categories</div></div>
       </div>
 
       <div class="section-title">Recent Activity</div>
@@ -325,6 +326,18 @@ canvas#sigCanvas{width:100%; height:110px; background:#fff; border:1px solid var
       </div>
     </div>
 
+    <!-- CATEGORIES -->
+    <div id="view-categories" class="hidden">
+      <div class="card">
+        <h2>Categories</h2>
+        <div class="sub">Who's involved — comes pre-loaded with Visitor, Contractor, Vendor, Staff, and Other — add more anytime, here or directly while logging an incident.</div>
+        <div id="categoriesMgmtList"></div>
+        <hr style="border:none; border-top:1px solid var(--line); margin:14px 0;">
+        <div class="field"><label>New Category</label><input type="text" id="newCategoryName" placeholder="e.g. Delivery Driver"></div>
+        <button class="btn btn-navy btn-block" id="addCategoryMgmtBtn">Add Category</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -352,8 +365,9 @@ const TYPES = [
     {name:'itemsHandedOver', label:'Items / Keys Handed Over', type:'textarea'},
     {name:'condition', label:'Condition / Remarks', type:'textarea'}
   ]},
-  {key:'incident', label:'Incident', icon:'!', fields:[
+  {key:'incident', label:'Incident', icon:'!', peopleInvolved:true, fields:[
     {name:'incidentType', label:'Incident Type', type:'incident-type-select'},
+    {name:'category', label:'Category', type:'category-select'},
     {name:'location', label:'Location', type:'text'},
     {name:'severity', label:'Severity', type:'select', options:['Low','Medium','High','Critical']},
     {name:'description', label:'Description', type:'textarea'},
@@ -397,13 +411,14 @@ function typeCfg(key){ return TYPES.find(t=>t.key===key); }
 let db = null;
 function idbOpen(){
   return new Promise((resolve, reject)=>{
-    const req = indexedDB.open('slb_physec_db', 3);
+    const req = indexedDB.open('slb_physec_db', 4);
     req.onupgradeneeded = function(e){
       const d = e.target.result;
       if(!d.objectStoreNames.contains('users')) d.createObjectStore('users', {keyPath:'id'});
       if(!d.objectStoreNames.contains('activities')) d.createObjectStore('activities', {keyPath:'id'});
       if(!d.objectStoreNames.contains('bits')) d.createObjectStore('bits', {keyPath:'id'});
       if(!d.objectStoreNames.contains('incidentTypes')) d.createObjectStore('incidentTypes', {keyPath:'id'});
+      if(!d.objectStoreNames.contains('incidentCategories')) d.createObjectStore('incidentCategories', {keyPath:'id'});
     };
     req.onsuccess = function(e){ db = e.target.result; resolve(db); };
     req.onerror = function(e){ reject(e); };
@@ -444,6 +459,7 @@ let users = [];
 let activities = [];
 let bits = [];
 let incidentTypes = [];
+let incidentCategories = [];
 let activeTypeKey = null;
 let editingId = null;
 let photoBuffer = [];
@@ -462,6 +478,15 @@ idbOpen().then(async ()=>{
       const rec = {id:uid(), name:name, createdAt:Date.now()};
       await idbPut('incidentTypes', rec);
       incidentTypes.push(rec);
+    }
+  }
+  incidentCategories = await idbGetAll('incidentCategories');
+  if(incidentCategories.length === 0){
+    const catDefaults = ['Visitor','Contractor','Vendor','Staff','Other'];
+    for(const name of catDefaults){
+      const rec = {id:uid(), name:name, createdAt:Date.now()};
+      await idbPut('incidentCategories', rec);
+      incidentCategories.push(rec);
     }
   }
   buildTypeUI();
@@ -585,7 +610,7 @@ document.getElementById('logoutBtn').addEventListener('click', function(){
 
 // ---------- Navigation ----------
 function showView(id){
-  ['view-home','view-form','view-log','view-reports','view-users','view-bits','view-incidenttypes'].forEach(function(v){
+  ['view-home','view-form','view-log','view-reports','view-users','view-bits','view-incidenttypes','view-categories'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v!==id);
   });
 }
@@ -602,6 +627,7 @@ document.querySelectorAll('.tile[data-nav]').forEach(function(t){
     if(nav==='users'){ showView('view-users'); renderUsersMgmt(); }
     if(nav==='bits'){ showView('view-bits'); renderBitsMgmt(); }
     if(nav==='incidenttypes'){ showView('view-incidenttypes'); renderIncidentTypesMgmt(); }
+    if(nav==='categories'){ showView('view-categories'); renderCategoriesMgmt(); }
   });
 });
 
@@ -701,6 +727,8 @@ function openForm(typeKey, existing){
       const val = existing && existing.details ? existing.details[f.name] : '';
       if(f.type === 'incident-type-select'){
         fieldEl = buildIncidentTypeField(val);
+      }else if(f.type === 'category-select'){
+        fieldEl = buildCategoryField(val);
       }else{
         fieldEl = buildField(f.name, f.label, f.type||'text', val, f.options);
       }
@@ -712,6 +740,16 @@ function openForm(typeKey, existing){
       wrap.appendChild(fieldEl);
     });
     wireConditionalFields(wrap);
+    if(cfg.peopleInvolved){
+      wrap.appendChild(buildPeopleField());
+      const existingPeople = (existing && existing.details && existing.details.peopleInvolved) ? existing.details.peopleInvolved : null;
+      if(existingPeople && existingPeople.length){
+        existingPeople.forEach(function(p){ addPersonRow(p.fullName, p.designation); });
+      }else{
+        addPersonRow('','');
+      }
+      document.getElementById('addPersonRowBtn').addEventListener('click', function(){ addPersonRow('',''); });
+    }
   }
   photoBuffer = existing && existing.photos ? existing.photos.slice() : [];
   renderPhotoThumbs();
@@ -752,6 +790,72 @@ function buildIncidentTypeField(value){
     '</div>';
   return wrap;
 }
+function buildCategoryField(value){
+  const wrap = document.createElement('div'); wrap.className = 'field';
+  const opts = incidentCategories.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(function(t){
+    return '<option value="'+escapeHtml(t.name)+'"'+(t.name===value?' selected':'')+'>'+escapeHtml(t.name)+'</option>';
+  }).join('');
+  wrap.innerHTML =
+    '<label>Category</label>'+
+    '<div style="display:flex; gap:6px;">'+
+      '<select data-field="category" style="flex:1; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px;">'+
+        '<option value="">Select category…</option>'+opts+
+      '</select>'+
+      '<button type="button" id="addCategoryInlineBtn" class="btn btn-outline btn-small">+ Add</button>'+
+    '</div>';
+  return wrap;
+}
+function buildPeopleField(){
+  const wrap = document.createElement('div'); wrap.className='field';
+  wrap.innerHTML =
+    '<label>People Involved</label>'+
+    '<table style="width:100%; border-collapse:collapse; font-size:13px;">'+
+    '<thead><tr>'+
+      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Full Name</th>'+
+      '<th style="text-align:left; padding:4px; color:var(--ink-soft); font-size:11px;">Designation</th>'+
+      '<th></th>'+
+    '</tr></thead>'+
+    '<tbody id="peopleBody"></tbody>'+
+    '</table>'+
+    '<button type="button" class="btn btn-outline btn-small" id="addPersonRowBtn" style="margin-top:8px;">+ Add Person</button>';
+  return wrap;
+}
+function addPersonRow(fullName, designation){
+  const tbody = document.getElementById('peopleBody');
+  if(!tbody) return;
+  const tr = document.createElement('tr');
+  const cellStyle = 'padding:4px; border-bottom:1px solid var(--line);';
+  const inputStyle = 'width:100%; border:1px solid var(--line); border-radius:6px; padding:6px; font-size:13px; font-family:inherit;';
+  tr.innerHTML =
+    '<td style="'+cellStyle+'"><input type="text" class="person-name" style="'+inputStyle+'" placeholder="Full name" value="'+escapeHtml(fullName||'')+'"></td>'+
+    '<td style="'+cellStyle+'"><input type="text" class="person-designation" style="'+inputStyle+'" placeholder="e.g. Visitor, Staff, Contractor" value="'+escapeHtml(designation||'')+'"></td>'+
+    '<td style="'+cellStyle+'"><button type="button" class="del-person-row" style="background:none; border:none; color:var(--danger); font-size:16px; padding:2px 4px;">&times;</button></td>';
+  tr.querySelector('.del-person-row').addEventListener('click', function(){ tr.remove(); });
+  tbody.appendChild(tr);
+}
+function getPeopleRows(){
+  const tbody = document.getElementById('peopleBody');
+  if(!tbody) return [];
+  return Array.from(tbody.querySelectorAll('tr')).map(function(tr){
+    return {
+      fullName: tr.querySelector('.person-name').value.trim(),
+      designation: tr.querySelector('.person-designation').value.trim()
+    };
+  }).filter(p=>p.fullName || p.designation);
+}
+function peopleTableHtml(people, cellPad){
+  const pad = cellPad || '4px';
+  return '<table style="width:100%; border-collapse:collapse; font-size:12px; margin-top:6px;">'+
+    '<thead><tr>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Full Name</th>'+
+      '<th style="text-align:left; padding:'+pad+'; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line);">Designation</th>'+
+    '</tr></thead><tbody>'+
+    (people.length ? people.map(function(p){
+      return '<tr><td style="padding:'+pad+'; border-bottom:1px solid var(--line);">'+escapeHtml(p.fullName||'—')+'</td>'+
+        '<td style="padding:'+pad+'; border-bottom:1px solid var(--line);">'+escapeHtml(p.designation||'—')+'</td></tr>';
+    }).join('') : '<tr><td colspan="2" style="padding:'+pad+'; color:var(--ink-soft);">No one added.</td></tr>')+
+    '</tbody></table>';
+}
 function wireConditionalFields(wrap){
   wrap.querySelectorAll('.field[data-cond-field]').forEach(function(fieldEl){
     const trigger = wrap.querySelector('[data-field="'+fieldEl.dataset.condField+'"]');
@@ -762,14 +866,30 @@ function wireConditionalFields(wrap){
     trigger.addEventListener('change', update);
     update();
   });
-  const addBtn = wrap.querySelector('#addIncidentTypeInlineBtn');
-  if(addBtn){
-    addBtn.addEventListener('click', async function(){
+  const addTypeBtn = wrap.querySelector('#addIncidentTypeInlineBtn');
+  if(addTypeBtn){
+    addTypeBtn.addEventListener('click', async function(){
       const name = prompt('Enter a new incident type:');
       if(!name) return;
       const rec = await addIncidentTypeToList(name);
       if(!rec) return;
       const sel = wrap.querySelector('[data-field="incidentType"]');
+      if(sel && !Array.from(sel.options).some(o=>o.value===rec.name)){
+        const opt = document.createElement('option');
+        opt.value = rec.name; opt.textContent = rec.name;
+        sel.appendChild(opt);
+      }
+      if(sel) sel.value = rec.name;
+    });
+  }
+  const addCatBtn = wrap.querySelector('#addCategoryInlineBtn');
+  if(addCatBtn){
+    addCatBtn.addEventListener('click', async function(){
+      const name = prompt('Enter a new category:');
+      if(!name) return;
+      const rec = await addIncidentCategoryToList(name);
+      if(!rec) return;
+      const sel = wrap.querySelector('[data-field="category"]');
       if(sel && !Array.from(sel.options).some(o=>o.value===rec.name)){
         const opt = document.createElement('option');
         opt.value = rec.name; opt.textContent = rec.name;
@@ -836,6 +956,7 @@ document.getElementById('saveActivityBtn').addEventListener('click', async funct
   const details = {};
   cfg.fields.forEach(f=>{ details[f.name] = getVal(f.name); });
   if(cfg.roster){ details.roster = getRosterRows(); }
+  if(cfg.peopleInvolved){ details.peopleInvolved = getPeopleRows(); }
   if(activeTypeKey === 'attendance' && details.status !== 'Absent'){ details.absenceReason = ''; }
   const record = {
     id: editingId || uid(),
@@ -953,6 +1074,10 @@ function openDetail(r){
     cfg.fields.forEach(function(f){
       rows += '<div><div class="dg-label">'+escapeHtml(f.label)+'</div><div>'+escapeHtml(r.details[f.name]||'—')+'</div></div>';
     });
+    if(cfg.peopleInvolved){
+      const people = (r.details && r.details.peopleInvolved) || [];
+      rows += '<div style="grid-column:1 / -1;"><div class="dg-label" style="margin-top:6px;">People Involved</div>'+peopleTableHtml(people,'6px')+'</div>';
+    }
   }
   let photosHtml = '';
   if(r.photos && r.photos.length){
@@ -1097,6 +1222,46 @@ document.getElementById('addIncidentTypeMgmtBtn').addEventListener('click', asyn
   renderIncidentTypesMgmt();
 });
 
+// ---------- Categories management ----------
+function renderCategoriesMgmt(){
+  const wrap = document.getElementById('categoriesMgmtList');
+  wrap.innerHTML = '';
+  incidentCategories.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(function(c){
+    const row = document.createElement('div');
+    row.className = 'user-pick';
+    row.style.marginBottom = '8px';
+    row.innerHTML = '<span>'+escapeHtml(c.name)+'</span><button class="btn btn-small btn-danger-outline" data-delcat="'+c.id+'">Remove</button>';
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('[data-delcat]').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      const id = btn.getAttribute('data-delcat');
+      if(!confirm('Remove this category from the list?')) return;
+      await idbDelete('incidentCategories', id);
+      incidentCategories = incidentCategories.filter(c=>c.id!==id);
+      renderCategoriesMgmt();
+    });
+  });
+}
+async function addIncidentCategoryToList(name){
+  name = (name||'').trim();
+  if(!name) return null;
+  if(incidentCategories.some(c=>c.name.toLowerCase()===name.toLowerCase())){
+    return incidentCategories.find(c=>c.name.toLowerCase()===name.toLowerCase());
+  }
+  const rec = {id:uid(), name:name, createdAt:Date.now()};
+  await idbPut('incidentCategories', rec);
+  incidentCategories.push(rec);
+  return rec;
+}
+document.getElementById('addCategoryMgmtBtn').addEventListener('click', async function(){
+  const name = document.getElementById('newCategoryName').value.trim();
+  if(!name){ alert('Enter a category name.'); return; }
+  await addIncidentCategoryToList(name);
+  document.getElementById('newCategoryName').value='';
+  renderCategoriesMgmt();
+});
+
 // ---------- Reports ----------
 document.getElementById('genReportBtn').addEventListener('click', function(){
   const list = filteredActivities('repType','repFrom','repTo', null);
@@ -1116,6 +1281,10 @@ document.getElementById('genReportBtn').addEventListener('click', function(){
     }else{
       let fieldRows = cfg.fields.map(f=>'<div><div class="dg-label">'+escapeHtml(f.label)+'</div><div>'+escapeHtml(r.details[f.name]||'—')+'</div></div>').join('');
       bodyHtml = '<div class="detail-grid">'+fieldRows+'</div>';
+      if(cfg.peopleInvolved){
+        const people = (r.details && r.details.peopleInvolved) || [];
+        bodyHtml += '<div class="dg-label" style="margin-top:6px;">People Involved</div>'+peopleTableHtml(people,'5px');
+      }
     }
     let photosHtml = (r.photos&&r.photos.length) ? '<div class="photo-grid">'+r.photos.map(p=>'<img src="'+p+'">').join('')+'</div>' : '';
     let sigHtml = r.signature ? '<div class="dg-label" style="margin-top:6px;">Signature — '+escapeHtml(r.signerName||'')+'</div><img class="sig-img" src="'+r.signature+'">' : '';
