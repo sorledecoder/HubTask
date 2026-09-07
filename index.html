@@ -144,7 +144,7 @@ canvas#sigCanvas{width:100%; height:110px; background:#fff; border:1px solid var
 .report-head h1{font-size:17px; margin:0;}
 .report-head .rng{font-size:12px; color:var(--ink-soft); margin-top:2px;}
 .summary-table{width:100%; border-collapse:collapse; margin-bottom:16px; font-size:12.5px;}
-.summary-table th{background:var(--navy); color:#fff; text-align:left; padding:6px 8px; font-size:11px; text-transform:uppercase;}
+.summary-table th{color:var(--navy); text-align:left; padding:6px 8px; font-size:11px; text-transform:uppercase; font-weight:800; border-bottom:2px solid var(--navy);}
 .summary-table td{padding:6px 8px; border-bottom:1px solid var(--line);}
 .record-block{border:1px solid var(--line); border-radius:9px; padding:12px; margin-bottom:12px; break-inside:avoid;}
 .record-block .rb-head{display:flex; justify-content:space-between; font-weight:700; font-size:13px; margin-bottom:6px;}
@@ -159,10 +159,13 @@ canvas#sigCanvas{width:100%; height:110px; background:#fff; border:1px solid var
 
 @media print{
   body{background:#fff;}
+  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important; }
   .no-print{display:none !important;}
   .container{max-width:none; padding:0;}
   .report-sheet{box-shadow:none; padding:6px;}
   .record-block{break-inside:avoid;}
+  .report-head h1, .rb-head, .dg-label{color:#000 !important;}
+  .summary-table th{color:#000 !important; border-bottom-color:#000 !important;}
 }
 body.is-printing .no-print{display:none !important;}
 </style>
