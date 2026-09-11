@@ -218,6 +218,8 @@ body.is-printing .no-print{display:none !important;}
 
     <!-- HOME -->
     <div id="view-home">
+      <div id="syncBanner" class="hint" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; cursor:pointer;"></div>
+
       <div class="section-title">Log New Activity</div>
       <div class="grid" id="typeTiles"></div>
 
@@ -229,6 +231,7 @@ body.is-printing .no-print{display:none !important;}
         <div class="tile" data-nav="bits"><div class="ico">⚑</div><div class="lbl">Bits / Posts</div></div>
         <div class="tile" data-nav="incidenttypes"><div class="ico">!</div><div class="lbl">Incident Types</div></div>
         <div class="tile" data-nav="categories"><div class="ico">◈</div><div class="lbl">Categories</div></div>
+        <div class="tile" data-nav="sync"><div class="ico">⇅</div><div class="lbl">Sync & Settings</div></div>
       </div>
 
       <div class="section-title">Recent Activity</div>
@@ -340,6 +343,21 @@ body.is-printing .no-print{display:none !important;}
         <hr style="border:none; border-top:1px solid var(--line); margin:14px 0;">
         <div class="field"><label>New Category</label><input type="text" id="newCategoryName" placeholder="e.g. Delivery Driver"></div>
         <button class="btn btn-navy btn-block" id="addCategoryMgmtBtn">Add Category</button>
+      </div>
+    </div>
+
+    <!-- SYNC & SETTINGS -->
+    <div id="view-sync" class="hidden">
+      <div class="card">
+        <h2>Sync & Settings</h2>
+        <div class="sub">Everything is saved on this device first, so the app always works offline. When you're online, connect it to your server and it will push new records automatically.</div>
+        <div class="field"><label>Server API Address</label>
+          <input type="text" id="apiBaseUrlInput" placeholder="https://yourserver.com/api">
+        </div>
+        <button class="btn btn-navy btn-block" id="saveApiUrlBtn">Save Address</button>
+        <div id="syncStatusBox" class="hint" style="margin-top:14px;"></div>
+        <button class="btn btn-amber btn-block" id="syncNowBtn" style="margin-top:10px;">Sync Now</button>
+        <div id="syncLog" style="margin-top:12px; font-size:12px; color:var(--ink-soft); max-height:160px; overflow-y:auto;"></div>
       </div>
     </div>
 
@@ -482,7 +500,7 @@ idbOpen().then(async ()=>{
   if(incidentTypes.length === 0){
     const defaults = ['Theft','Access Violation','Fighting','Non-Compliance'];
     for(const name of defaults){
-      const rec = {id:uid(), name:name, createdAt:Date.now()};
+      const rec = {id:uid(), name:name, createdAt:Date.now(), synced:false, remoteId:null};
       await idbPut('incidentTypes', rec);
       incidentTypes.push(rec);
     }
@@ -491,7 +509,7 @@ idbOpen().then(async ()=>{
   if(incidentCategories.length === 0){
     const catDefaults = ['Visitor','Contractor','Vendor','Staff','Other'];
     for(const name of catDefaults){
-      const rec = {id:uid(), name:name, createdAt:Date.now()};
+      const rec = {id:uid(), name:name, createdAt:Date.now(), synced:false, remoteId:null};
       await idbPut('incidentCategories', rec);
       incidentCategories.push(rec);
     }
@@ -523,7 +541,7 @@ document.getElementById('setupCreateBtn').addEventListener('click', async functi
   const role = document.getElementById('setupRole').value;
   const pin = document.getElementById('setupPin').value.trim();
   if(!name || pin.length!==4){ alert('Enter a name and a 4-digit PIN.'); return; }
-  const u = {id:uid(), name:name, role:role, pin:pin, createdAt:Date.now()};
+  const u = {id:uid(), name:name, role:role, pin:pin, createdAt:Date.now(), synced:false, remoteId:null};
   await idbPut('users', u);
   users.push(u);
   document.getElementById('setupBlock').classList.add('hidden');
@@ -606,6 +624,7 @@ function loginAs(u){
   document.getElementById('signerNameInput').value = u.name;
   document.getElementById('signerPositionInput').value = u.role;
   goHome();
+  trySyncSoon();
 }
 document.getElementById('logoutBtn').addEventListener('click', function(){
   sessionStorage.removeItem('slb_session_user');
@@ -618,7 +637,7 @@ document.getElementById('logoutBtn').addEventListener('click', function(){
 
 // ---------- Navigation ----------
 function showView(id){
-  ['view-home','view-form','view-log','view-reports','view-users','view-bits','view-incidenttypes','view-categories'].forEach(function(v){
+  ['view-home','view-form','view-log','view-reports','view-users','view-bits','view-incidenttypes','view-categories','view-sync'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v!==id);
   });
 }
@@ -626,6 +645,7 @@ document.getElementById('homeBtn').addEventListener('click', goHome);
 function goHome(){
   showView('view-home');
   renderRecent();
+  renderSyncBanner();
 }
 document.querySelectorAll('.tile[data-nav]').forEach(function(t){
   t.addEventListener('click', function(){
@@ -636,6 +656,7 @@ document.querySelectorAll('.tile[data-nav]').forEach(function(t){
     if(nav==='bits'){ showView('view-bits'); renderBitsMgmt(); }
     if(nav==='incidenttypes'){ showView('view-incidenttypes'); renderIncidentTypesMgmt(); }
     if(nav==='categories'){ showView('view-categories'); renderCategoriesMgmt(); }
+    if(nav==='sync'){ showView('view-sync'); renderSyncScreen(); }
   });
 });
 
@@ -967,6 +988,7 @@ document.getElementById('saveActivityBtn').addEventListener('click', async funct
   if(cfg.roster){ details.roster = getRosterRows(); }
   if(cfg.peopleInvolved){ details.peopleInvolved = getPeopleRows(); }
   if(activeTypeKey === 'attendance' && details.status !== 'Absent'){ details.absenceReason = ''; }
+  const prevRecord = editingId ? activities.find(a=>a.id===editingId) : null;
   const record = {
     id: editingId || uid(),
     type: activeTypeKey,
@@ -979,12 +1001,16 @@ document.getElementById('saveActivityBtn').addEventListener('click', async funct
     signerName: document.getElementById('signerNameInput').value.trim() || currentUser.name,
     signerPosition: document.getElementById('signerPositionInput').value.trim() || '',
     loggedBy: currentUser.name,
-    createdAt: editingId ? (activities.find(a=>a.id===editingId)||{}).createdAt || Date.now() : Date.now()
+    loggedById: currentUser.id,
+    createdAt: editingId ? (activities.find(a=>a.id===editingId)||{}).createdAt || Date.now() : Date.now(),
+    synced: false,
+    remoteId: prevRecord ? (prevRecord.remoteId || null) : null
   };
   await idbPut('activities', record);
   const idx = activities.findIndex(a=>a.id===record.id);
   if(idx>=0) activities[idx]=record; else activities.push(record);
   goHome();
+  trySyncSoon();
 });
 
 // ---------- Recent / summary line ----------
@@ -1149,11 +1175,12 @@ document.getElementById('addUserBtn').addEventListener('click', async function()
   const role = document.getElementById('newUserRole').value;
   const pin = document.getElementById('newUserPin').value.trim();
   if(!name || pin.length!==4){ alert('Enter a name and a 4-digit PIN.'); return; }
-  const u = {id:uid(), name:name, role:role, pin:pin, createdAt:Date.now()};
+  const u = {id:uid(), name:name, role:role, pin:pin, createdAt:Date.now(), synced:false, remoteId:null};
   await idbPut('users', u);
   users.push(u);
   document.getElementById('newUserName').value=''; document.getElementById('newUserPin').value='';
   renderUsersMgmt();
+  trySyncSoon();
 });
 
 // ---------- Bits / Posts management ----------
@@ -1185,11 +1212,12 @@ document.getElementById('addBitBtn').addEventListener('click', async function(){
   const name = document.getElementById('newBitName').value.trim();
   if(!name){ alert('Enter a bit/post name.'); return; }
   if(bits.some(b=>b.name.toLowerCase()===name.toLowerCase())){ alert('That bit already exists.'); return; }
-  const b = {id:uid(), name:name, createdAt:Date.now()};
+  const b = {id:uid(), name:name, createdAt:Date.now(), synced:false, remoteId:null};
   await idbPut('bits', b);
   bits.push(b);
   document.getElementById('newBitName').value='';
   renderBitsMgmt();
+  trySyncSoon();
 });
 
 // ---------- Incident Types management ----------
@@ -1219,7 +1247,7 @@ async function addIncidentTypeToList(name){
   if(incidentTypes.some(t=>t.name.toLowerCase()===name.toLowerCase())){
     return incidentTypes.find(t=>t.name.toLowerCase()===name.toLowerCase());
   }
-  const rec = {id:uid(), name:name, createdAt:Date.now()};
+  const rec = {id:uid(), name:name, createdAt:Date.now(), synced:false, remoteId:null};
   await idbPut('incidentTypes', rec);
   incidentTypes.push(rec);
   return rec;
@@ -1230,6 +1258,7 @@ document.getElementById('addIncidentTypeMgmtBtn').addEventListener('click', asyn
   await addIncidentTypeToList(name);
   document.getElementById('newIncidentTypeName').value='';
   renderIncidentTypesMgmt();
+  trySyncSoon();
 });
 
 // ---------- Categories management ----------
@@ -1259,7 +1288,7 @@ async function addIncidentCategoryToList(name){
   if(incidentCategories.some(c=>c.name.toLowerCase()===name.toLowerCase())){
     return incidentCategories.find(c=>c.name.toLowerCase()===name.toLowerCase());
   }
-  const rec = {id:uid(), name:name, createdAt:Date.now()};
+  const rec = {id:uid(), name:name, createdAt:Date.now(), synced:false, remoteId:null};
   await idbPut('incidentCategories', rec);
   incidentCategories.push(rec);
   return rec;
@@ -1270,6 +1299,7 @@ document.getElementById('addCategoryMgmtBtn').addEventListener('click', async fu
   await addIncidentCategoryToList(name);
   document.getElementById('newCategoryName').value='';
   renderCategoriesMgmt();
+  trySyncSoon();
 });
 
 // ---------- Reports ----------
@@ -1363,6 +1393,222 @@ async function shareReport(list, from, to, counts){
   const body = encodeURIComponent(summaryText + '\n\n(Attach the exported PDF/CSV file to this email before sending.)');
   window.location.href = 'mailto:?subject=' + encodeURIComponent('SLB Physical Security Report') + '&body=' + body;
 }
+
+// ============================================================
+// SYNC LAYER — pushes locally-saved records to the PHP/MySQL
+// backend whenever the device is online. Everything still saves
+// to IndexedDB first, so the app keeps working with zero signal;
+// this just clears the backlog whenever a connection is available.
+// ============================================================
+let apiBaseUrl = localStorage.getItem('slb_api_base_url') || '';
+let lastSyncAt = localStorage.getItem('slb_last_sync_at') || null;
+let syncing = false;
+let syncLogLines = [];
+
+const DB_TYPE_MAP = {
+  patrol:'patrol', handover:'handover', incident:'incident', report:'report',
+  observation:'observation', itemdeclaration:'item_declaration',
+  gatepass:'gatepass', attendance:'attendance', posting:'posting'
+};
+
+function apiUrl(path){ return apiBaseUrl.replace(/\/$/,'') + path; }
+
+async function apiFetch(path, options){
+  const res = await fetch(apiUrl(path), options);
+  let data = null;
+  try{ data = await res.json(); }catch(e){ /* no body */ }
+  if(!res.ok){ throw new Error((data && data.error) ? data.error : ('HTTP ' + res.status)); }
+  return data;
+}
+
+function logSync(msg){
+  syncLogLines.unshift(new Date().toLocaleTimeString() + ' — ' + msg);
+  syncLogLines = syncLogLines.slice(0, 30);
+  renderSyncLog();
+}
+
+function countPending(){
+  return activities.filter(a=>!a.synced).length +
+         users.filter(u=>!u.synced).length +
+         bits.filter(b=>!b.synced).length +
+         incidentTypes.filter(t=>!t.synced).length +
+         incidentCategories.filter(c=>!c.synced).length;
+}
+
+async function syncLookupList(list, storeName, endpoint){
+  const pending = list.filter(x=>!x.synced);
+  for(const item of pending){
+    try{
+      await apiFetch('/'+endpoint+'.php', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: item.name})
+      });
+      item.synced = true;
+      await idbPut(storeName, item);
+    }catch(e){
+      if(String(e.message).toLowerCase().includes('already exists')){
+        item.synced = true;
+        await idbPut(storeName, item);
+      }else{
+        logSync(storeName + ' sync failed for "' + item.name + '": ' + e.message);
+      }
+    }
+  }
+}
+
+async function syncUsersList(){
+  const pending = users.filter(u=>!u.synced);
+  for(const u of pending){
+    try{
+      const result = await apiFetch('/users.php', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({full_name: u.name, role: u.role, pin: u.pin})
+      });
+      u.remoteId = result.id;
+      u.synced = true;
+      await idbPut('users', u);
+    }catch(e){
+      logSync('User sync failed for "' + u.name + '": ' + e.message);
+    }
+  }
+}
+
+function detailsForPayload(details){
+  const copy = Object.assign({}, details);
+  delete copy.roster;
+  delete copy.peopleInvolved;
+  return copy;
+}
+
+function buildActivityPayload(a){
+  const cfg = typeCfg(a.type);
+  const supervisorUser = users.find(u=>u.name === a.supervisorName);
+  const loggedByUser = users.find(u=>u.id === a.loggedById) || users.find(u=>u.name === a.loggedBy);
+
+  const payload = {
+    activity_type: DB_TYPE_MAP[a.type] || a.type,
+    activity_date: a.date,
+    activity_time: a.time || null,
+    supervisor_id: (supervisorUser && supervisorUser.remoteId) ? supervisorUser.remoteId : null,
+    supervisor_name: a.supervisorName || '',
+    logged_by_id: (loggedByUser && loggedByUser.remoteId) ? loggedByUser.remoteId : null,
+    logged_by_name: a.loggedBy || '',
+    signer_name: a.signerName || '',
+    signer_position: a.signerPosition || '',
+    details: detailsForPayload(a.details)
+  };
+  if(a.signature){ payload.signature_base64 = a.signature; }
+  if(cfg.roster){
+    payload.roster = (a.details.roster || []).map(r=>({guardName:r.guardName, beat:r.beat, time:r.time}));
+  }
+  if(cfg.peopleInvolved){
+    payload.people = (a.details.peopleInvolved || []).map(p=>({fullName:p.fullName, designation:p.designation}));
+  }
+  if(a.photos && a.photos.length){ payload.photos = a.photos.slice(); }
+  return payload;
+}
+
+async function syncActivitiesList(){
+  const pending = activities.filter(a=>!a.synced);
+  for(const a of pending){
+    try{
+      const payload = buildActivityPayload(a);
+      let result;
+      if(a.remoteId){
+        result = await apiFetch('/activities.php?id=' + a.remoteId, {
+          method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+      }else{
+        result = await apiFetch('/activities.php', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        a.remoteId = result.id;
+      }
+      a.synced = true;
+      await idbPut('activities', a);
+    }catch(e){
+      logSync('Activity sync failed (' + a.type + ' ' + a.date + '): ' + e.message);
+    }
+  }
+}
+
+async function syncAll(manual){
+  if(!apiBaseUrl){
+    if(manual) logSync('Set a server address first, under Sync & Settings.');
+    return;
+  }
+  if(!navigator.onLine){
+    if(manual) logSync('Offline — will sync automatically once back online.');
+    return;
+  }
+  if(syncing) return;
+  syncing = true;
+  renderSyncBanner(); renderSyncScreen();
+  try{
+    await syncLookupList(bits, 'bits', 'bits');
+    await syncLookupList(incidentTypes, 'incidentTypes', 'incident_types');
+    await syncLookupList(incidentCategories, 'incidentCategories', 'incident_categories');
+    await syncUsersList();
+    await syncActivitiesList();
+    lastSyncAt = Date.now();
+    localStorage.setItem('slb_last_sync_at', String(lastSyncAt));
+    logSync('Sync complete — ' + countPending() + ' still pending.');
+  }catch(e){
+    logSync('Sync stopped: ' + e.message);
+  }
+  syncing = false;
+  renderSyncBanner(); renderSyncScreen();
+  renderRecent();
+}
+
+function trySyncSoon(){
+  if(apiBaseUrl && navigator.onLine){ setTimeout(function(){ syncAll(false); }, 300); }
+}
+
+function renderSyncBanner(){
+  const el = document.getElementById('syncBanner');
+  if(!el) return;
+  const pending = countPending();
+  const online = navigator.onLine;
+  let text;
+  if(!apiBaseUrl){ text = 'Server not connected — tap to set one up'; }
+  else if(syncing){ text = 'Syncing…'; }
+  else if(pending > 0){ text = pending + ' record(s) waiting to sync' + (online ? '' : ' (offline)'); }
+  else{ text = online ? 'All records synced' : 'Offline — saved on this device'; }
+  el.innerHTML = '<span>' + (online ? '🟢' : '🔴') + ' ' + escapeHtml(text) + '</span>' +
+    '<span style="font-size:11px; text-decoration:underline;">' + (apiBaseUrl ? 'Sync settings' : 'Set up sync') + '</span>';
+  el.onclick = function(){ showView('view-sync'); renderSyncScreen(); };
+}
+
+function renderSyncScreen(){
+  const urlInput = document.getElementById('apiBaseUrlInput');
+  if(urlInput) urlInput.value = apiBaseUrl;
+  const box = document.getElementById('syncStatusBox');
+  if(box){
+    const pending = countPending();
+    const lastText = lastSyncAt ? new Date(Number(lastSyncAt)).toLocaleString() : 'never';
+    box.innerHTML = (navigator.onLine ? 'Online' : 'Offline') + ' · ' + pending + ' record(s) pending · last synced: ' + escapeHtml(lastText);
+  }
+  renderSyncLog();
+}
+
+function renderSyncLog(){
+  const el = document.getElementById('syncLog');
+  if(!el) return;
+  el.innerHTML = syncLogLines.map(l=>'<div>'+escapeHtml(l)+'</div>').join('');
+}
+
+document.getElementById('saveApiUrlBtn').addEventListener('click', function(){
+  apiBaseUrl = document.getElementById('apiBaseUrlInput').value.trim().replace(/\/$/,'');
+  localStorage.setItem('slb_api_base_url', apiBaseUrl);
+  logSync(apiBaseUrl ? 'Server address saved.' : 'Server address cleared.');
+  renderSyncScreen();
+  trySyncSoon();
+});
+document.getElementById('syncNowBtn').addEventListener('click', function(){ syncAll(true); });
+
+window.addEventListener('online', function(){ renderSyncBanner(); trySyncSoon(); });
+window.addEventListener('offline', function(){ renderSyncBanner(); });
 
 })();
 </script>
